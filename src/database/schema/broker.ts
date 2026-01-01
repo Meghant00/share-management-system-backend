@@ -1,9 +1,9 @@
-import { pgTable, bigint, varchar, decimal, date, time, timestamp, text, integer } from 'drizzle-orm/pg-core';
+import { pgTable, bigint, varchar, text, integer } from 'drizzle-orm/pg-core';
 
-export const floorsheet = pgTable('floorsheet', {
+export const broker = pgTable('broker', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
-  name: text().notNull(),
+  name: text().notNull().unique(),
   code: integer('code').notNull(),
-  tmslink: varchar('tmslink', { length: 255}).notNull(),
+  tmslink: varchar('tmslink', { length: 255 }).notNull(),
 });
 

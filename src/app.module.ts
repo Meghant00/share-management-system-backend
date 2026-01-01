@@ -4,10 +4,12 @@ import { AppService } from './app.service';
 import { FloorsheetController } from './floorsheet/floorsheet.controller';
 import { FloorsheetService } from './floorsheet/floorsheet.service';
 import { DatabaseModule } from './database/database.module';
+import { BrokerService } from './broker/broker.service';
+import { BrokerController } from './broker/broker.controller';
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [AppController, FloorsheetController],
-  providers: [AppService, FloorsheetService],
+  controllers: [AppController, FloorsheetController, BrokerController],
+  providers: [AppService, FloorsheetService, BrokerService],
 })
-export class AppModule {}
+export class AppModule { }

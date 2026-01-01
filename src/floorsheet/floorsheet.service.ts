@@ -5,7 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../database/schema/floorsheet';
 import { eq, inArray } from 'drizzle-orm';
 
-interface FloorsheetAuthContext {
+export interface FloorsheetAuthContext {
   authToken: string;
   initialId: number;
 }
@@ -17,7 +17,7 @@ export interface FloorsheetResult {
 
 @Injectable()
 export class FloorsheetService {
-  constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>) {}
+  constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>) { }
 
   async fetchAndSaveFloorsheet(): Promise<FloorsheetResult> {
     const allTrades: any[] = [];
@@ -93,7 +93,7 @@ export class FloorsheetService {
     }
   }
 
-  private async initializeAndAuthenticate(
+  async initializeAndAuthenticate(
     page: Page,
   ): Promise<FloorsheetAuthContext> {
     let authToken: string | null = null;
@@ -224,7 +224,7 @@ export class FloorsheetService {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           let newInitialId: number | null = null;
-          
+
           const tokenPromise: Promise<{ token: string; id: number }> = new Promise((resolve, reject) => {
             // Set timeout to prevent hanging forever
             const timeout = setTimeout(() => {
@@ -240,7 +240,7 @@ export class FloorsheetService {
                 clearTimeout(timeout);
                 page.off('request', handler);
                 const newToken = req.headers()['authorization'];
-                
+
                 // Also capture the new initialId from the request body
                 const postData = req.postData();
                 if (postData) {
@@ -253,7 +253,7 @@ export class FloorsheetService {
                     // ignore parse error
                   }
                 }
-                
+
                 resolve({ token: newToken, id: newInitialId || currentInitialId });
               }
             };
@@ -263,7 +263,7 @@ export class FloorsheetService {
 
           // Reload the page to trigger a new floorsheet request
           await page.reload({ waitUntil: 'networkidle', timeout: 60000 });
-          
+
           // Re-authenticate after reload (similar to initial auth)
           await page.evaluate(async () => {
             await fetch('https://nepalstock.com.np/api/authenticate/prove', {
@@ -274,18 +274,18 @@ export class FloorsheetService {
           await page.waitForTimeout(2000); // Increased wait time
 
           const result = await tokenPromise;
-          
+
           // Verify token actually changed
           if (result.token === oldToken) {
             console.warn('Warning: Token did not change after refresh');
           } else {
             console.log('Token successfully refreshed (token changed)');
           }
-          
+
           if (result.id !== currentInitialId) {
             console.log(`InitialId updated: ${currentInitialId} -> ${result.id}`);
           }
-          
+
           return { token: result.token, initialId: result.id };
         } catch (error) {
           lastError = error as Error;
@@ -311,7 +311,7 @@ export class FloorsheetService {
           console.log(
             `Fetching page ${pageNumber}, attempt ${attempt}/3, using initialId: ${currentInitialId}`,
           );
-          
+
           pageData = await page.evaluate(
             async ({ token, pageSize: size, pageNumber, lastId }) => {
               const res = await fetch(
@@ -330,7 +330,7 @@ export class FloorsheetService {
               if (text.startsWith('<')) {
                 return { expired: true };
               }
-              
+
               try {
                 const parsed = JSON.parse(text);
                 // Check if response has empty content array
@@ -363,7 +363,7 @@ export class FloorsheetService {
             console.log('Token refreshed successfully');
             console.log('New authToken:', authToken?.substring(0, 20) + '...');
             console.log('New initialId:', currentInitialId);
-            
+
             // Wait a bit before retrying with new token
             await page.waitForTimeout(1000);
             continue; // Retry the request with new token
@@ -458,22 +458,22 @@ export class FloorsheetService {
 
       // Filter out records that already exist by checking contractId
       const contractIds = insertData.map((d) => d.contractId);
-      
+
       // Check which contractIds already exist in the database
       const existingContractIds = new Set(
         contractIds.length === 1
           ? (
-              await this.db
-                .select({ contractId: schema.floorsheet.contractId })
-                .from(schema.floorsheet)
-                .where(eq(schema.floorsheet.contractId, contractIds[0]))
-            ).map((r) => r.contractId)
+            await this.db
+              .select({ contractId: schema.floorsheet.contractId })
+              .from(schema.floorsheet)
+              .where(eq(schema.floorsheet.contractId, contractIds[0]))
+          ).map((r) => r.contractId)
           : (
-              await this.db
-                .select({ contractId: schema.floorsheet.contractId })
-                .from(schema.floorsheet)
-                .where(inArray(schema.floorsheet.contractId, contractIds))
-            ).map((r) => r.contractId),
+            await this.db
+              .select({ contractId: schema.floorsheet.contractId })
+              .from(schema.floorsheet)
+              .where(inArray(schema.floorsheet.contractId, contractIds))
+          ).map((r) => r.contractId),
       );
 
       // Filter to only insert records that don't exist
