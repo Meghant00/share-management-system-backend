@@ -1,6 +1,9 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Inject } from '@nestjs/common';
 import { chromium, Page } from 'playwright';
 import * as fs from 'fs';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import * as schema from '../database/schema';
+import { eq, inArray } from 'drizzle-orm';
 
 interface FloorsheetAuthContext {
   authToken: string;
@@ -14,6 +17,8 @@ export interface FloorsheetResult {
 
 @Injectable()
 export class FloorsheetService {
+  constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>) {}
+
   async fetchAndSaveFloorsheet(): Promise<FloorsheetResult> {
     const allTrades: any[] = [];
 
@@ -404,6 +409,9 @@ export class FloorsheetService {
         const pageCount = pageData.floorsheets.content.length;
         allTrades.push(...pageData.floorsheets.content);
 
+        // Insert data into database if it doesn't exist
+        await this.insertFloorsheetDataIfNotExists(pageData.floorsheets.content);
+
         console.log(
           `✓ Fetched page ${pageNumber + 1}: ${pageCount} records, running total: ${allTrades.length}/${totalTrades}`,
         );
@@ -423,6 +431,73 @@ export class FloorsheetService {
       }
 
       await page.waitForTimeout(1000);
+    }
+  }
+
+  private async insertFloorsheetDataIfNotExists(trades: any[]): Promise<void> {
+    if (trades.length === 0) {
+      return;
+    }
+
+    try {
+      // Prepare data for insertion - map API response to database schema
+      const insertData = trades.map((trade) => ({
+        contractId: Number(trade.contractId),
+        stockSymbol: trade.stockSymbol || '',
+        contractQuantity: Number(trade.contractQuantity),
+        contractRate: trade.contractRate?.toString() || '0',
+        contractAmount: trade.contractAmount?.toString() || '0',
+        buyerMemberId: trade.buyerMemberId || '',
+        sellerMemberId: trade.sellerMemberId || '',
+        buyerBrokerName: trade.buyerBrokerName || null,
+        sellerBrokerName: trade.sellerBrokerName || null,
+        businessDate: trade.businessDate || new Date().toISOString().slice(0, 10),
+        tradeTime: trade.tradeTime || null,
+        securityName: trade.securityName || null,
+      }));
+
+      // Filter out records that already exist by checking contractId
+      const contractIds = insertData.map((d) => d.contractId);
+      
+      // Check which contractIds already exist in the database
+      const existingContractIds = new Set(
+        contractIds.length === 1
+          ? (
+              await this.db
+                .select({ contractId: schema.floorsheet.contractId })
+                .from(schema.floorsheet)
+                .where(eq(schema.floorsheet.contractId, contractIds[0]))
+            ).map((r) => r.contractId)
+          : (
+              await this.db
+                .select({ contractId: schema.floorsheet.contractId })
+                .from(schema.floorsheet)
+                .where(inArray(schema.floorsheet.contractId, contractIds))
+            ).map((r) => r.contractId),
+      );
+
+      // Filter to only insert records that don't exist
+      const newRecords = insertData.filter(
+        (record) => !existingContractIds.has(record.contractId),
+      );
+
+      if (newRecords.length === 0) {
+        console.log(`  All ${insertData.length} records already exist in database`);
+        return;
+      }
+
+      // Insert in batches of 1000 for better performance
+      const batchSize = 1000;
+      for (let i = 0; i < newRecords.length; i += batchSize) {
+        const batch = newRecords.slice(i, i + batchSize);
+        await this.db.insert(schema.floorsheet).values(batch);
+        console.log(
+          `  Inserted batch ${Math.floor(i / batchSize) + 1}: ${batch.length} new records (${insertData.length - newRecords.length} already existed)`,
+        );
+      }
+    } catch (error) {
+      console.error('Error inserting floorsheet data:', error);
+      // Don't throw error, just log it so the process continues
     }
   }
 
