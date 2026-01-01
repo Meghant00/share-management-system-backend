@@ -1,0 +1,128 @@
+{
+  "id": "a1d8a3bf-34a9-4287-b7d4-53d8c6b70149",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.floorsheet": {
+      "name": "floorsheet",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "floorsheet_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "contract_id": {
+          "name": "contract_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stock_symbol": {
+          "name": "stock_symbol",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_quantity": {
+          "name": "contract_quantity",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_rate": {
+          "name": "contract_rate",
+          "type": "numeric(18, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_amount": {
+          "name": "contract_amount",
+          "type": "numeric(18, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "buyer_member_id": {
+          "name": "buyer_member_id",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seller_member_id": {
+          "name": "seller_member_id",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "buyer_broker_name": {
+          "name": "buyer_broker_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "seller_broker_name": {
+          "name": "seller_broker_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "business_date": {
+          "name": "business_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trade_time": {
+          "name": "trade_time",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "security_name": {
+          "name": "security_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
