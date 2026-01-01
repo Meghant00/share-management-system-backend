@@ -2,7 +2,7 @@ import { Injectable, InternalServerErrorException, Inject } from '@nestjs/common
 import { chromium, Page } from 'playwright';
 import * as fs from 'fs';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import * as schema from '../database/schema';
+import * as schema from '../database/schema/floorsheet';
 import { eq, inArray } from 'drizzle-orm';
 
 interface FloorsheetAuthContext {
