@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1767251588575,
-      "tag": "0000_nostalgic_mercury",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1767254187816,
-      "tag": "0001_lean_pandemic",
+      "when": 1767265450768,
+      "tag": "0000_watery_shard",
       "breakpoints": true
     }
   ]

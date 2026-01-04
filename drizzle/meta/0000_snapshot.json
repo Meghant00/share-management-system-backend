@@ -1,9 +1,65 @@
 {
-  "id": "a1d8a3bf-34a9-4287-b7d4-53d8c6b70149",
+  "id": "45171f87-0b52-4a9e-ad77-470e5680b8f8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.broker": {
+      "name": "broker",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "broker_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tmslink": {
+          "name": "tmslink",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "broker_name_unique": {
+          "name": "broker_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.floorsheet": {
       "name": "floorsheet",
       "schema": "",
@@ -87,7 +143,7 @@
         },
         "trade_time": {
           "name": "trade_time",
-          "type": "time",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

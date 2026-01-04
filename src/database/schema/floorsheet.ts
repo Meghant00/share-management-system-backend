@@ -1,4 +1,4 @@
-import { pgTable, bigint, varchar, decimal, date, time, timestamp, text } from 'drizzle-orm/pg-core';
+import { pgTable, bigint, varchar, decimal, date, timestamp, text } from 'drizzle-orm/pg-core';
 
 export const floorsheet = pgTable('floorsheet', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
@@ -12,7 +12,7 @@ export const floorsheet = pgTable('floorsheet', {
   buyerBrokerName: text('buyer_broker_name'),
   sellerBrokerName: text('seller_broker_name'),
   businessDate: date('business_date').notNull(),
-  tradeTime: time('trade_time'),
+  tradeTime: timestamp('trade_time', { withTimezone: true }),
   securityName: varchar('security_name', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

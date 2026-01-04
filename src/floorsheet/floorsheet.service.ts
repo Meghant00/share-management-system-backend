@@ -452,7 +452,7 @@ export class FloorsheetService {
         buyerBrokerName: trade.buyerBrokerName || null,
         sellerBrokerName: trade.sellerBrokerName || null,
         businessDate: trade.businessDate || new Date().toISOString().slice(0, 10),
-        tradeTime: trade.tradeTime || null,
+        tradeTime: new Date(trade.tradeTime) || null,
         securityName: trade.securityName || null,
       }));
 
