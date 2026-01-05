@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Inject,
+} from '@nestjs/common';
 import { chromium, Page } from 'playwright';
 import * as fs from 'fs';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -17,7 +21,7 @@ export interface FloorsheetResult {
 
 @Injectable()
 export class FloorsheetService {
-  constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>) { }
+  constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>) {}
 
   async fetchAndSaveFloorsheet(): Promise<FloorsheetResult> {
     const allTrades: any[] = [];
@@ -45,7 +49,6 @@ export class FloorsheetService {
       console.log('Authenticated');
 
       const firstPageData = await this.fetchFirstPage(page, authContext);
-
 
       if (
         !firstPageData ||
@@ -77,7 +80,8 @@ export class FloorsheetService {
       );
 
       const csvContent = this.buildCsvContent(allTrades);
-      const dateString = allTrades[0].businessDate || new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const dateString =
+        allTrades[0].businessDate || new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       const filePath = this.saveCsvToDatedFile(csvContent, dateString);
 
       await browser.close();
@@ -93,9 +97,7 @@ export class FloorsheetService {
     }
   }
 
-  async initializeAndAuthenticate(
-    page: Page,
-  ): Promise<FloorsheetAuthContext> {
+  async initializeAndAuthenticate(page: Page): Promise<FloorsheetAuthContext> {
     let authToken: string | null = null;
     let initialId: number | null = null;
 
@@ -216,7 +218,10 @@ export class FloorsheetService {
     console.log('Initial authToken:', authToken?.substring(0, 20) + '...');
     console.log('Initial initialId:', currentInitialId);
 
-    const refreshToken = async (): Promise<{ token: string; initialId: number }> => {
+    const refreshToken = async (): Promise<{
+      token: string;
+      initialId: number;
+    }> => {
       const maxRetries = 3;
       let lastError: Error | null = null;
       const oldToken = authToken;
@@ -225,41 +230,49 @@ export class FloorsheetService {
         try {
           let newInitialId: number | null = null;
 
-          const tokenPromise: Promise<{ token: string; id: number }> = new Promise((resolve, reject) => {
-            // Set timeout to prevent hanging forever
-            const timeout = setTimeout(() => {
-              page.off('request', handler);
-              reject(new Error('Token refresh timeout: No floorsheet request detected'));
-            }, 30000); // 30 second timeout
-
-            const handler = (req: any) => {
-              if (
-                req.url().includes('/api/nots/nepse-data/floorsheet') &&
-                req.headers()['authorization']
-              ) {
-                clearTimeout(timeout);
+          const tokenPromise: Promise<{ token: string; id: number }> =
+            new Promise((resolve, reject) => {
+              // Set timeout to prevent hanging forever
+              const timeout = setTimeout(() => {
                 page.off('request', handler);
-                const newToken = req.headers()['authorization'];
+                reject(
+                  new Error(
+                    'Token refresh timeout: No floorsheet request detected',
+                  ),
+                );
+              }, 30000); // 30 second timeout
 
-                // Also capture the new initialId from the request body
-                const postData = req.postData();
-                if (postData) {
-                  try {
-                    const body = JSON.parse(postData);
-                    if (body.id !== undefined) {
-                      newInitialId = body.id;
+              const handler = (req: any) => {
+                if (
+                  req.url().includes('/api/nots/nepse-data/floorsheet') &&
+                  req.headers()['authorization']
+                ) {
+                  clearTimeout(timeout);
+                  page.off('request', handler);
+                  const newToken = req.headers()['authorization'];
+
+                  // Also capture the new initialId from the request body
+                  const postData = req.postData();
+                  if (postData) {
+                    try {
+                      const body = JSON.parse(postData);
+                      if (body.id !== undefined) {
+                        newInitialId = body.id;
+                      }
+                    } catch {
+                      // ignore parse error
                     }
-                  } catch {
-                    // ignore parse error
                   }
-                }
 
-                resolve({ token: newToken, id: newInitialId || currentInitialId });
-              }
-            };
-            // Attach handler BEFORE reloading to catch the request
-            page.on('request', handler);
-          });
+                  resolve({
+                    token: newToken,
+                    id: newInitialId || currentInitialId,
+                  });
+                }
+              };
+              // Attach handler BEFORE reloading to catch the request
+              page.on('request', handler);
+            });
 
           // Reload the page to trigger a new floorsheet request
           await page.reload({ waitUntil: 'networkidle', timeout: 60000 });
@@ -283,13 +296,18 @@ export class FloorsheetService {
           }
 
           if (result.id !== currentInitialId) {
-            console.log(`InitialId updated: ${currentInitialId} -> ${result.id}`);
+            console.log(
+              `InitialId updated: ${currentInitialId} -> ${result.id}`,
+            );
           }
 
           return { token: result.token, initialId: result.id };
         } catch (error) {
           lastError = error as Error;
-          console.log(`Token refresh attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+          console.log(
+            `Token refresh attempt ${attempt}/${maxRetries} failed:`,
+            lastError.message,
+          );
           if (attempt < maxRetries) {
             await page.waitForTimeout(2000 * attempt);
           }
@@ -370,14 +388,21 @@ export class FloorsheetService {
           }
 
           if (pageData?.empty) {
-            console.warn(`Page ${pageNumber + 1} returned empty array. Response:`, JSON.stringify(pageData.data).substring(0, 200));
+            console.warn(
+              `Page ${pageNumber + 1} returned empty array. Response:`,
+              JSON.stringify(pageData.data).substring(0, 200),
+            );
             // Still mark as successful to avoid infinite retries
             requestSuccessful = true;
             break;
           }
 
           if (pageData?.error) {
-            console.error(`Error parsing response for page ${pageNumber + 1}:`, pageData.error, pageData.raw);
+            console.error(
+              `Error parsing response for page ${pageNumber + 1}:`,
+              pageData.error,
+              pageData.raw,
+            );
             if (attempt < 3) {
               await page.waitForTimeout(1000);
               continue;
@@ -388,7 +413,10 @@ export class FloorsheetService {
           requestSuccessful = true;
           break;
         } catch (error) {
-          console.error(`Error fetching page ${pageNumber + 1}, attempt ${attempt}:`, error);
+          console.error(
+            `Error fetching page ${pageNumber + 1}, attempt ${attempt}:`,
+            error,
+          );
           if (attempt < 3) {
             await page.waitForTimeout(1000 * attempt);
           }
@@ -396,7 +424,9 @@ export class FloorsheetService {
       }
 
       if (!requestSuccessful) {
-        console.error(`Failed to fetch page ${pageNumber + 1} after 3 attempts`);
+        console.error(
+          `Failed to fetch page ${pageNumber + 1} after 3 attempts`,
+        );
         continue; // Skip this page and continue
       }
 
@@ -410,7 +440,9 @@ export class FloorsheetService {
         allTrades.push(...pageData.floorsheets.content);
 
         // Insert data into database if it doesn't exist
-        await this.insertFloorsheetDataIfNotExists(pageData.floorsheets.content);
+        await this.insertFloorsheetDataIfNotExists(
+          pageData.floorsheets.content,
+        );
 
         console.log(
           `✓ Fetched page ${pageNumber + 1}: ${pageCount} records, running total: ${allTrades.length}/${totalTrades}`,
@@ -447,13 +479,11 @@ export class FloorsheetService {
         contractQuantity: Number(trade.contractQuantity),
         contractRate: trade.contractRate?.toString() || '0',
         contractAmount: trade.contractAmount?.toString() || '0',
-        buyerMemberId: trade.buyerMemberId || '',
-        sellerMemberId: trade.sellerMemberId || '',
-        buyerBrokerName: trade.buyerBrokerName || null,
-        sellerBrokerName: trade.sellerBrokerName || null,
-        businessDate: trade.businessDate || new Date().toISOString().slice(0, 10),
+        buyerMemberId: trade.buyerMemberId || 0,
+        sellerMemberId: trade.sellerMemberId || 0,
+        businessDate:
+          trade.businessDate || new Date().toISOString().slice(0, 10),
         tradeTime: new Date(trade.tradeTime) || null,
-        securityName: trade.securityName || null,
       }));
 
       // Filter out records that already exist by checking contractId
@@ -463,17 +493,17 @@ export class FloorsheetService {
       const existingContractIds = new Set(
         contractIds.length === 1
           ? (
-            await this.db
-              .select({ contractId: schema.floorsheet.contractId })
-              .from(schema.floorsheet)
-              .where(eq(schema.floorsheet.contractId, contractIds[0]))
-          ).map((r) => r.contractId)
+              await this.db
+                .select({ contractId: schema.floorsheet.contractId })
+                .from(schema.floorsheet)
+                .where(eq(schema.floorsheet.contractId, contractIds[0]))
+            ).map((r) => r.contractId)
           : (
-            await this.db
-              .select({ contractId: schema.floorsheet.contractId })
-              .from(schema.floorsheet)
-              .where(inArray(schema.floorsheet.contractId, contractIds))
-          ).map((r) => r.contractId),
+              await this.db
+                .select({ contractId: schema.floorsheet.contractId })
+                .from(schema.floorsheet)
+                .where(inArray(schema.floorsheet.contractId, contractIds))
+            ).map((r) => r.contractId),
       );
 
       // Filter to only insert records that don't exist
@@ -482,7 +512,9 @@ export class FloorsheetService {
       );
 
       if (newRecords.length === 0) {
-        console.log(`  All ${insertData.length} records already exist in database`);
+        console.log(
+          `  All ${insertData.length} records already exist in database`,
+        );
         return;
       }
 
@@ -525,7 +557,8 @@ export class FloorsheetService {
     return header + '\n' + csvRows.join('\n');
   }
 
-  private saveCsvToDatedFile(csvContent: string, dateString: string): string { // YYYY-MM-DD
+  private saveCsvToDatedFile(csvContent: string, dateString: string): string {
+    // YYYY-MM-DD
     const filePath = `${dateString}.csv`;
 
     fs.writeFileSync(filePath, csvContent);
