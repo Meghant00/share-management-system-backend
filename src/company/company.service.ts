@@ -24,6 +24,8 @@ interface Company {
 export interface CompanyResult {
   totalCompanies: number;
   insertedCompanies: number;
+  totalSecurities: number;
+  insertedSecurities: number;
 }
 
 @Injectable()
@@ -56,9 +58,19 @@ export class CompanyService {
 
       console.log('Fetched Companies:', companiesData.length);
 
-      const saveData = await this.saveCompanies(companiesData);
+      const companiesSaveData = await this.saveCompanies(companiesData);
 
-      return saveData;
+      const securities = await this.fetchSecurities(context, authContext);
+
+      console.log('Fetched Securities:', securities.length);
+
+      const saveSecurities = await this.saveSecurities(securities);
+
+      return {
+        ...companiesSaveData,
+        insertedSecurities: saveSecurities.insertedSecurities,
+        totalSecurities: saveSecurities.totalSecurities,
+      };
     } catch (error) {
       console.error('Error fetching broker:', error);
       throw error;
@@ -84,6 +96,25 @@ export class CompanyService {
     return companiesData;
   }
 
+  private async fetchSecurities(
+    context: BrowserContext,
+    authContext: FloorsheetAuthContext,
+  ): Promise<any> {
+    const res = await context.request.get(
+      'https://www.nepalstock.com/api/nots/security?nonDelisted=true',
+      {
+        headers: {
+          Authorization: authContext.authToken,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    const securitiesData = await res.json();
+
+    return securitiesData;
+  }
+
   private async saveCompanies(companies: any[]) {
     const parsedCompanies: Company[] = companies.map((company) => {
       const tempCompany = {
@@ -99,12 +130,12 @@ export class CompanyService {
     let insertedCompanies = 0;
 
     for (const company of parsedCompanies) {
-      const doesBrokerExists = await this.db
+      const doesCompanyExists = await this.db
         .select({ code: schema.company.companyId })
         .from(schema.company)
         .where(eq(schema.company.companyId, company.companyId));
 
-      if (doesBrokerExists.length === 0) {
+      if (doesCompanyExists.length === 0) {
         await this.db
           .insert(schema.company)
           .values(company)
@@ -116,6 +147,47 @@ export class CompanyService {
     return {
       totalCompanies: parsedCompanies.length,
       insertedCompanies: insertedCompanies,
+    };
+  }
+
+  private async saveSecurities(securities: any[]) {
+    const parsedSecurities: Company[] = securities.map((security) => {
+      const tempSecurity: Company = {
+        companyId: security.id,
+        companyName: security.securityName,
+        symbol: security.symbol,
+        securityName: security.securityName,
+        status: security.activeStatus,
+        companyEmail: '',
+        website: '',
+        sectorName: '',
+        regulatoryBody: '',
+        instrumentType: '',
+      };
+
+      return tempSecurity;
+    });
+
+    let insertedSecurities = 0;
+
+    for (const security of parsedSecurities) {
+      const doesSecurityExists = await this.db
+        .select({ code: schema.company.companyId })
+        .from(schema.company)
+        .where(eq(schema.company.companyId, security.companyId));
+
+      if (doesSecurityExists.length === 0) {
+        await this.db
+          .insert(schema.company)
+          .values(security)
+          .onConflictDoNothing();
+        insertedSecurities++;
+      }
+    }
+
+    return {
+      totalSecurities: parsedSecurities.length,
+      insertedSecurities: insertedSecurities,
     };
   }
 }
