@@ -1,8 +1,21 @@
-import { Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import {
   FloorsheetResult,
   FloorsheetService,
+  SaveFloorsheetCsvResult,
 } from './floorsheet.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+
+interface FloorsheetSaveCSVDao {
+  csvFile: FormData;
+  text: string;
+}
 
 @Controller('floorsheet')
 export class FloorsheetController {
@@ -12,7 +25,12 @@ export class FloorsheetController {
   async fetchFloorsheet(): Promise<FloorsheetResult> {
     return this.floorsheetService.fetchAndSaveFloorsheet();
   }
+
+  @Post('save-from-csv')
+  @UseInterceptors(FileInterceptor('xlsxFile'))
+  async saveFloorsheetFromCsv(
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<SaveFloorsheetCsvResult> {
+    return this.floorsheetService.saveFloorSheetFromCsv(file);
+  }
 }
-
-
-

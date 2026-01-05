@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../database/schema/floorsheet';
 import { eq, inArray } from 'drizzle-orm';
+import { parse } from 'node-xlsx';
 
 export interface FloorsheetAuthContext {
   authToken: string;
@@ -15,13 +16,41 @@ export interface FloorsheetAuthContext {
 }
 
 export interface FloorsheetResult {
-  filePath: string;
   totalTrades: number;
+}
+
+export interface Floorsheet {
+  contractId: number;
+  stockSymbol: string;
+  contractQuantity: number;
+  contractRate: number;
+  contractAmount: number;
+  buyerMemberId: number;
+  sellerMemberId: number;
+  businessDate: string;
+  tradeTime?: string;
+}
+
+export interface SaveFloorsheetCsvResult {
+  insertedTrades: number;
 }
 
 @Injectable()
 export class FloorsheetService {
-  constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>) {}
+  private keys;
+  constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>) {
+    this.keys = [
+      'sn',
+      'contractId',
+      'stockSymbol',
+      'buyerId',
+      'sellerId',
+      'quantity',
+      'rate',
+      'amount',
+      'businessDate',
+    ];
+  }
 
   async fetchAndSaveFloorsheet(): Promise<FloorsheetResult> {
     const allTrades: any[] = [];
@@ -79,14 +108,9 @@ export class FloorsheetService {
         totalTrades,
       );
 
-      const csvContent = this.buildCsvContent(allTrades);
-      const dateString =
-        allTrades[0].businessDate || new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-      const filePath = this.saveCsvToDatedFile(csvContent, dateString);
-
       await browser.close();
 
-      return { filePath, totalTrades: allTrades.length };
+      return { totalTrades: allTrades.length };
     } catch (error) {
       console.error('Floorsheet fetch failed', error);
       await browser.close();
@@ -483,7 +507,7 @@ export class FloorsheetService {
         sellerMemberId: trade.sellerMemberId || 0,
         businessDate:
           trade.businessDate || new Date().toISOString().slice(0, 10),
-        tradeTime: new Date(trade.tradeTime) || null,
+        tradeTime: trade.tradeTime ? new Date(trade.tradeTime) : null,
       }));
 
       // Filter out records that already exist by checking contractId
@@ -564,5 +588,111 @@ export class FloorsheetService {
     fs.writeFileSync(filePath, csvContent);
 
     return filePath;
+  }
+
+  public async saveFloorSheetFromCsv(xlsxFile: Express.Multer.File) {
+    return this.readFloorSheet(xlsxFile);
+  }
+
+  private async readFloorSheet(
+    xlsxFile: Express.Multer.File,
+  ): Promise<SaveFloorsheetCsvResult> {
+    console.log(`loading file ${xlsxFile.originalname}`);
+
+    const fileResponse = parse(xlsxFile.buffer);
+
+    console.log(fileResponse.length);
+
+    const trades: Floorsheet[] = [];
+
+    for (const sheet of fileResponse) {
+      console.log(`Inserting ${sheet.name}`);
+      const parsedTransactions = this.getDataFromSheet(
+        sheet,
+        xlsxFile.originalname,
+      );
+
+      trades.push(...parsedTransactions);
+
+      console.log(`Pushed ${parsedTransactions.length} trades`);
+    }
+
+    await this.insertFloorsheetDataIfNotExists(trades);
+
+    return { insertedTrades: trades.length };
+  }
+
+  private getDataFromSheet(sheet, location) {
+    const data = sheet.data.slice(1);
+
+    const parsedTransactions: Floorsheet[] = [];
+
+    // extract the part after "_"
+    const dateStr = location.split('_')[1]; // "20251217"
+
+    // parse year, month, day
+    const year = Number(dateStr.slice(0, 4));
+    const month = Number(dateStr.slice(4, 6)) - 1; // JS months are 0-based
+    const day = Number(dateStr.slice(6, 8));
+
+    // create Date object
+    const businessDate = new Date(year, month, day).toLocaleDateString();
+
+    data.map((transaction) => {
+      const tempTransaction: any = {
+        sn: 0,
+        contractId: 0,
+        stockSymbol: '',
+        buyerId: 0,
+        sellerId: 0,
+        quantity: 0,
+        rate: 0,
+        amount: 0,
+      };
+      this.keys.forEach((key, index) => {
+        tempTransaction[key] = transaction[index];
+      });
+
+      tempTransaction.businessDate = businessDate;
+
+      const parsedTransaction: Floorsheet = {
+        contractId: tempTransaction.contractId,
+        stockSymbol: tempTransaction.stockSymbol,
+        contractQuantity: tempTransaction.quantity,
+        contractRate: tempTransaction.rate,
+        contractAmount: tempTransaction.contractAmount,
+        buyerMemberId: tempTransaction.buyerId,
+        sellerMemberId: tempTransaction.sellerId,
+        businessDate: tempTransaction.businessDate,
+      };
+
+      parsedTransactions.push(parsedTransaction);
+    });
+
+    return parsedTransactions;
+  }
+
+  private saveDataInCsv(trades: Floorsheet[]) {
+    const header = this.keys.join(',');
+
+    const csvRows = trades.map((r) =>
+      [
+        r.contractId,
+        r.stockSymbol,
+        r.buyerMemberId,
+        r.sellerMemberId,
+        r.contractQuantity,
+        r.contractRate,
+        r.contractAmount,
+        r.businessDate,
+      ].join(','),
+    );
+
+    fs.writeFileSync(
+      `floorsheet-${Date.now()}.csv`,
+      header + '\n' + csvRows.join('\n'),
+    );
+
+    console.log('Saved data to floorsheet.csv');
   }
 }
