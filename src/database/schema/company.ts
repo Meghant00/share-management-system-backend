@@ -4,7 +4,7 @@ export const company = pgTable('company', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   companyId: integer('companyId'),
   companyName: varchar('company_name', { length: 255 }).notNull(),
-  symbol: varchar('symbol', { length: 20 }).notNull(),
+  symbol: varchar('symbol', { length: 20 }).notNull().unique(),
   securityName: varchar('security_name', { length: 255 }).notNull(),
   status: varchar('status', { length: 1 }).notNull(),
   companyEmail: varchar('company_email', { length: 255 }),

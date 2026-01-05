@@ -1,5 +1,5 @@
 {
-  "id": "45171f87-0b52-4a9e-ad77-470e5680b8f8",
+  "id": "95eb7fb8-ff4c-4382-bd85-28be5d5a607e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -48,11 +48,109 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "broker_name_unique": {
-          "name": "broker_name_unique",
+        "broker_code_unique": {
+          "name": "broker_code_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "name"
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.company": {
+      "name": "company",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "company_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "companyId": {
+          "name": "companyId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_name": {
+          "name": "company_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "symbol": {
+          "name": "symbol",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "security_name": {
+          "name": "security_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(1)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "company_email": {
+          "name": "company_email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "website": {
+          "name": "website",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sector_name": {
+          "name": "sector_name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "regulatory_body": {
+          "name": "regulatory_body",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "instrument_type": {
+          "name": "instrument_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "company_symbol_unique": {
+          "name": "company_symbol_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "symbol"
           ]
         }
       },
@@ -113,27 +211,15 @@
         },
         "buyer_member_id": {
           "name": "buyer_member_id",
-          "type": "varchar(50)",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
         "seller_member_id": {
           "name": "seller_member_id",
-          "type": "varchar(50)",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
-        },
-        "buyer_broker_name": {
-          "name": "buyer_broker_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "seller_broker_name": {
-          "name": "seller_broker_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "business_date": {
           "name": "business_date",
@@ -146,23 +232,50 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "security_name": {
-          "name": "security_name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "floorsheet_stock_symbol_fk": {
+          "name": "floorsheet_stock_symbol_fk",
+          "tableFrom": "floorsheet",
+          "tableTo": "company",
+          "columnsFrom": [
+            "stock_symbol"
+          ],
+          "columnsTo": [
+            "symbol"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "floorsheet_buyer_member_id_fk": {
+          "name": "floorsheet_buyer_member_id_fk",
+          "tableFrom": "floorsheet",
+          "tableTo": "broker",
+          "columnsFrom": [
+            "buyer_member_id"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "floorsheet_seller_member_id_fk": {
+          "name": "floorsheet_seller_member_id_fk",
+          "tableFrom": "floorsheet",
+          "tableTo": "broker",
+          "columnsFrom": [
+            "seller_member_id"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
