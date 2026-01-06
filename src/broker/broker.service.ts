@@ -1,126 +1,148 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { chromium, Page } from "playwright";
+import { Inject, Injectable } from '@nestjs/common';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { chromium, Page } from 'playwright';
 import * as schema from '../database/schema/broker';
-import { FloorsheetAuthContext, FloorsheetService } from "src/floorsheet/floorsheet.service";
-import { eq } from "drizzle-orm";
-
+import {
+  FloorsheetAuthContext,
+  FloorsheetService,
+} from 'src/floorsheet/floorsheet.service';
+import { eq } from 'drizzle-orm';
 
 export interface BrokerResult {
-    totalBrokers: number;
+  totalBrokers: number;
 }
 
 interface Broker {
-    name: string;
-    code: number;
-    tmslink: string;
+  name: string;
+  code: number;
+  tmslink: string;
 }
 
 export interface BrokerResult {
-    totalBrokers: number;
-    insertedBrokers: number;
+  totalBrokers: number;
+  insertedBrokers: number;
 }
 
 @Injectable()
 export class BrokerService {
-    constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>,
-        private readonly floorsheetService: FloorsheetService) { }
+  constructor(
+    @Inject('DB') private db: NodePgDatabase<typeof schema>,
+    private readonly floorsheetService: FloorsheetService,
+  ) {}
 
-    async fetchAndSaveBrokers(): Promise<BrokerResult> {
+  async fetchAndSaveBrokers(): Promise<BrokerResult> {
+    const browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--disable-dev-shm-usage',
+        '--no-sandbox',
+      ],
+    });
+    const context = await browser.newContext({
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
+    });
+    const page = await context.newPage();
 
-        const browser = await chromium.launch({
-            headless: true,
-            args: [
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-            ],
-        });
-        const context = await browser.newContext({
-            userAgent:
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            viewport: { width: 1920, height: 1080 },
-        });
-        const page = await context.newPage();
+    console.log('Fetching brokers...');
 
-        console.log('Fetching brokers...');
+    try {
+      const authContext =
+        await this.floorsheetService.initializeAndAuthenticate(page);
 
-        try {
-            const authContext = await this.floorsheetService.initializeAndAuthenticate(page);
+      console.log('Authenticated');
 
-            console.log('Authenticated');
+      console.log('Auth context:', authContext);
 
-            console.log('Auth context:', authContext);
+      const brokersData = await this.fetchBrokers(page, authContext);
 
-            const brokersData = await this.fetchBrokers(page, authContext);
+      console.log('Brokers:', brokersData);
 
-            console.log('Brokers:', brokersData);
+      const brokers = brokersData.content;
 
-            const brokers = brokersData.content;
+      const saveData = await this.saveBrokers(brokers);
 
-            const saveData = await this.saveBrokers(brokers);
-
-            return saveData
-
-        } catch (error) {
-            console.error('Error fetching broker:', error);
-            throw error;
-        }
+      return saveData;
+    } catch (error) {
+      console.error('Error fetching broker:', error);
+      throw error;
     }
+  }
 
-    private async fetchBrokers(
-        page: Page,
-        context: FloorsheetAuthContext,
-    ): Promise<any> {
-        const brokersData: any = await page.evaluate(
-            async ({ token }) => {
-                const res = await fetch(
-                    'https://nepalstock.com.np/api/nots/member?&size=500',
-                    {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: token,
-                        },
-                    },
-                );
-
-                const text = await res.text();
-                try {
-                    return JSON.parse(text);
-                } catch {
-                    return { error: 'Not JSON', raw: text };
-                }
+  private async fetchBrokers(
+    page: Page,
+    context: FloorsheetAuthContext,
+  ): Promise<any> {
+    const brokersData: any = await page.evaluate(
+      async ({ token }) => {
+        const res = await fetch(
+          'https://nepalstock.com.np/api/nots/member?&size=500',
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: token,
             },
-            { token: context.authToken },
+          },
         );
 
-        return brokersData;
-    }
-
-    private async saveBrokers(brokers: any[]): Promise<BrokerResult> {
-
-        const parsedBrokers: Broker[] = brokers.map((broker) => ({
-            name: broker.memberName,
-            code: broker.memberCode,
-            tmslink: broker.memberTMSLinkMapping?.tmsLink || "",
-        }));
-
-        let insertedBrokers = 0
-
-        for (const broker of parsedBrokers) {
-
-            const doesBrokerExists = await this.db
-                .select({ code: schema.broker.code })
-                .from(schema.broker)
-                .where(eq(schema.broker.code, broker.code))
-
-            if (doesBrokerExists.length === 0) {
-                await this.db.insert(schema.broker).values(broker).onConflictDoNothing();
-                insertedBrokers++;
-            }
+        const text = await res.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          return { error: 'Not JSON', raw: text };
         }
+      },
+      { token: context.authToken },
+    );
 
-        return { totalBrokers: parsedBrokers.length, insertedBrokers: insertedBrokers };
+    return brokersData;
+  }
+
+  private async saveBrokers(brokers: any[]): Promise<BrokerResult> {
+    const parsedBrokers: Broker[] = brokers.map((broker) => ({
+      name: broker.memberName,
+      code: broker.memberCode,
+      tmslink: broker.memberTMSLinkMapping?.tmsLink || '',
+    }));
+
+    let insertedBrokers = 0;
+
+    for (const broker of parsedBrokers) {
+      const doesBrokerExists = await this.db
+        .select({ code: schema.broker.code })
+        .from(schema.broker)
+        .where(eq(schema.broker.code, broker.code));
+
+      if (doesBrokerExists.length === 0) {
+        await this.db
+          .insert(schema.broker)
+          .values(broker)
+          .onConflictDoNothing();
+        insertedBrokers++;
+      }
     }
+
+    return {
+      totalBrokers: parsedBrokers.length,
+      insertedBrokers: insertedBrokers,
+    };
+  }
+
+  public async getAllBrokers() {
+    const result = await this.db
+      .select({
+        id: schema.broker.id,
+        name: schema.broker.name,
+        code: schema.broker.code,
+        tmslink: schema.broker.tmslink,
+      })
+      .from(schema.broker);
+
+    console.log(`Selected ${result.length} brokers`);
+
+    return result;
+  }
 }
