@@ -190,4 +190,26 @@ export class CompanyService {
       insertedSecurities: insertedSecurities,
     };
   }
+
+  public async getAllCompanies() {
+    const result = await this.db
+      .select({
+        companyId: schema.company.companyId,
+        companyName: schema.company.companyName,
+        symbol: schema.company.symbol,
+        securityName: schema.company.securityName,
+        status: schema.company.status,
+        companyEmail: schema.company.companyEmail,
+        website: schema.company.website,
+        sectorName: schema.company.sectorName,
+        regulatoryBody: schema.company.regulatoryBody,
+        instrumentType: schema.company.instrumentType,
+      })
+      .from(schema.company)
+      .orderBy(schema.company.symbol);
+
+    console.log(`Fetched ${result.length} companies`);
+
+    return result;
+  }
 }
