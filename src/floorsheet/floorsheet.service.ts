@@ -7,7 +7,7 @@ import { chromium, Page } from 'playwright';
 import * as fs from 'fs';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../database/schema/floorsheet';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { parse } from 'node-xlsx';
 
 export interface FloorsheetAuthContext {
@@ -33,6 +33,19 @@ export interface Floorsheet {
 
 export interface SaveFloorsheetCsvResult {
   insertedTrades: number;
+}
+
+export interface UniqueCompaniesInFloorsheet {
+  stockSymbol: string;
+  companyName: string;
+  totalQuantity: number;
+  averageRate: number;
+  averageAmount: number;
+}
+
+export interface UniqueCompaniesInFloorsheetResult {
+  data: UniqueCompaniesInFloorsheet[];
+  total: number;
 }
 
 @Injectable()
@@ -694,5 +707,36 @@ export class FloorsheetService {
     );
 
     console.log('Saved data to floorsheet.csv');
+  }
+  async getUniqueCompaniesInFloorsheet() {
+    const query = sql`SELECT DISTINCT(f.stock_symbol) AS stock_symbol, ROUND(SUM(f.contract_quantity), 4) total_quantity, 
+                      ROUND(AVG(f.contract_rate), 4) average_rate, ROUND(AVG(f.contract_amount), 4) average_amount,
+                      c.company_name
+                      FROM floorsheet f
+                      INNER JOIN company c
+                      ON f.stock_symbol = c.symbol
+                      GROUP BY c.company_name, f.stock_symbol
+                      ORDER BY f.stock_symbol`;
+
+    const result = await this.db.execute(query);
+
+    const parsedResult: UniqueCompaniesInFloorsheet[] = result.rows.map(
+      (row) => {
+        return {
+          averageAmount: Number(row.average_amount),
+          averageRate: Number(row.average_rate),
+          companyName: row.company_name as string,
+          stockSymbol: row.stock_symbol as string,
+          totalQuantity: Number(row.total_quantity),
+        };
+      },
+    );
+
+    const response: UniqueCompaniesInFloorsheetResult = {
+      data: parsedResult,
+      total: result.rowCount || 0,
+    };
+
+    return response;
   }
 }

@@ -4,6 +4,7 @@ import {
   Post,
   UseInterceptors,
   UploadedFile,
+  Get,
 } from '@nestjs/common';
 import {
   FloorsheetResult,
@@ -32,5 +33,10 @@ export class FloorsheetController {
     @UploadedFile() file: Express.Multer.File,
   ): Promise<SaveFloorsheetCsvResult> {
     return this.floorsheetService.saveFloorSheetFromCsv(file);
+  }
+
+  @Get('traded-companies')
+  async getListOfTradedCompanies() {
+    return this.floorsheetService.getUniqueCompaniesInFloorsheet();
   }
 }
