@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import * as schema from '../database/schema/company';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { FloorsheetService } from 'src/floorsheet/floorsheet.service';
 import { BrowserContext, chromium, Page } from 'playwright';
 import { eq } from 'drizzle-orm';
 import {

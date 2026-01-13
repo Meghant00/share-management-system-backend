@@ -2,11 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { chromium, Page } from 'playwright';
 import * as schema from '../database/schema/broker';
-import {
-  FloorsheetAuthContext,
-  FloorsheetService,
-} from 'src/floorsheet/floorsheet.service';
 import { eq } from 'drizzle-orm';
+import {
+  NepseAuthContext,
+  NepseAuthService,
+} from 'src/nepseAuth/nepseAuth.service';
 
 export interface BrokerResult {
   totalBrokers: number;
@@ -27,7 +27,7 @@ export interface BrokerResult {
 export class BrokerService {
   constructor(
     @Inject('DB') private db: NodePgDatabase<typeof schema>,
-    private readonly floorsheetService: FloorsheetService,
+    private readonly nepseAuthService: NepseAuthService,
   ) {}
 
   async fetchAndSaveBrokers(): Promise<BrokerResult> {
@@ -49,8 +49,7 @@ export class BrokerService {
     console.log('Fetching brokers...');
 
     try {
-      const authContext =
-        await this.floorsheetService.initializeAndAuthenticate(page);
+      const authContext = await this.nepseAuthService.getCredentials(page);
 
       console.log('Authenticated');
 
@@ -73,7 +72,7 @@ export class BrokerService {
 
   private async fetchBrokers(
     page: Page,
-    context: FloorsheetAuthContext,
+    context: NepseAuthContext,
   ): Promise<any> {
     const brokersData: any = await page.evaluate(
       async ({ token }) => {
@@ -95,7 +94,7 @@ export class BrokerService {
           return { error: 'Not JSON', raw: text };
         }
       },
-      { token: context.authToken },
+      { token: context.token },
     );
 
     return brokersData;
