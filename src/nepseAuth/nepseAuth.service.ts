@@ -12,9 +12,6 @@ export class NepseAuthService {
   private initialId: number | null = null;
 
   async getCredentials(page: Page): Promise<NepseAuthContext> {
-    if (this.authToken && this.initialId) {
-      return { token: this.authToken, id: this.initialId };
-    }
     return await this.refreshCredentials(page);
   }
 

@@ -9,6 +9,10 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../database/schema/floorsheet';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { parse } from 'node-xlsx';
+import {
+  NepseAuthContext,
+  NepseAuthService,
+} from 'src/nepseAuth/nepseAuth.service';
 
 export interface FloorsheetAuthContext {
   authToken: string;
@@ -51,7 +55,10 @@ export interface UniqueCompaniesInFloorsheetResult {
 @Injectable()
 export class FloorsheetService {
   private keys;
-  constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>) {
+  constructor(
+    @Inject('DB') private db: NodePgDatabase<typeof schema>,
+    private readonly nepseAuthService: NepseAuthService,
+  ) {
     this.keys = [
       'sn',
       'contractId',
@@ -86,7 +93,7 @@ export class FloorsheetService {
     console.log('Fetching floorsheet...');
 
     try {
-      const authContext = await this.initializeAndAuthenticate(page);
+      const authContext = await this.nepseAuthService.getCredentials(page);
 
       console.log('Authenticated');
 
@@ -211,7 +218,7 @@ export class FloorsheetService {
 
   private async fetchFirstPage(
     page: Page,
-    context: FloorsheetAuthContext,
+    context: NepseAuthContext,
   ): Promise<any> {
     const firstPageData: any = await page.evaluate(
       async ({ token, lastId }) => {
@@ -234,7 +241,7 @@ export class FloorsheetService {
           return { error: 'Not JSON', raw: text };
         }
       },
-      { token: context.authToken, lastId: context.initialId },
+      { token: context.token, lastId: context.id },
     );
 
     return firstPageData;
@@ -242,119 +249,18 @@ export class FloorsheetService {
 
   private async fetchRemainingPages(
     page: Page,
-    context: FloorsheetAuthContext,
+    context: NepseAuthContext,
     pageSize: number,
     totalPages: number,
     allTrades: any[],
     totalTrades: number,
   ): Promise<void> {
-    let authToken = context.authToken;
-    let currentInitialId = context.initialId;
+    let authToken = context.token;
+    let currentInitialId = context.id;
 
     console.log('Starting fetchRemainingPages');
     console.log('Initial authToken:', authToken?.substring(0, 20) + '...');
     console.log('Initial initialId:', currentInitialId);
-
-    const refreshToken = async (): Promise<{
-      token: string;
-      initialId: number;
-    }> => {
-      const maxRetries = 3;
-      let lastError: Error | null = null;
-      const oldToken = authToken;
-
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          let newInitialId: number | null = null;
-
-          const tokenPromise: Promise<{ token: string; id: number }> =
-            new Promise((resolve, reject) => {
-              // Set timeout to prevent hanging forever
-              const timeout = setTimeout(() => {
-                page.off('request', handler);
-                reject(
-                  new Error(
-                    'Token refresh timeout: No floorsheet request detected',
-                  ),
-                );
-              }, 30000); // 30 second timeout
-
-              const handler = (req: any) => {
-                if (
-                  req.url().includes('/api/nots/nepse-data/floorsheet') &&
-                  req.headers()['authorization']
-                ) {
-                  clearTimeout(timeout);
-                  page.off('request', handler);
-                  const newToken = req.headers()['authorization'];
-
-                  // Also capture the new initialId from the request body
-                  const postData = req.postData();
-                  if (postData) {
-                    try {
-                      const body = JSON.parse(postData);
-                      if (body.id !== undefined) {
-                        newInitialId = body.id;
-                      }
-                    } catch {
-                      // ignore parse error
-                    }
-                  }
-
-                  resolve({
-                    token: newToken,
-                    id: newInitialId || currentInitialId,
-                  });
-                }
-              };
-              // Attach handler BEFORE reloading to catch the request
-              page.on('request', handler);
-            });
-
-          // Reload the page to trigger a new floorsheet request
-          await page.reload({ waitUntil: 'networkidle', timeout: 60000 });
-
-          // Re-authenticate after reload (similar to initial auth)
-          await page.evaluate(async () => {
-            await fetch('https://nepalstock.com.np/api/authenticate/prove', {
-              method: 'POST',
-              credentials: 'include',
-            });
-          });
-          await page.waitForTimeout(2000); // Increased wait time
-
-          const result = await tokenPromise;
-
-          // Verify token actually changed
-          if (result.token === oldToken) {
-            console.warn('Warning: Token did not change after refresh');
-          } else {
-            console.log('Token successfully refreshed (token changed)');
-          }
-
-          if (result.id !== currentInitialId) {
-            console.log(
-              `InitialId updated: ${currentInitialId} -> ${result.id}`,
-            );
-          }
-
-          return { token: result.token, initialId: result.id };
-        } catch (error) {
-          lastError = error as Error;
-          console.log(
-            `Token refresh attempt ${attempt}/${maxRetries} failed:`,
-            lastError.message,
-          );
-          if (attempt < maxRetries) {
-            await page.waitForTimeout(2000 * attempt);
-          }
-        }
-      }
-
-      throw new InternalServerErrorException(
-        `Failed to refresh token after ${maxRetries} attempts: ${lastError?.message}`,
-      );
-    };
 
     // First page is already fetched separately; start from page 2
     for (let pageNumber = 0; pageNumber < totalPages; pageNumber++) {
@@ -364,7 +270,7 @@ export class FloorsheetService {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           console.log(
-            `Fetching page ${pageNumber}, attempt ${attempt}/3, using initialId: ${currentInitialId}`,
+            `Fetching page ${pageNumber + 1}, attempt ${attempt}/3, using initialId: ${currentInitialId}`,
           );
 
           pageData = await page.evaluate(
@@ -411,9 +317,10 @@ export class FloorsheetService {
 
           if (pageData?.expired) {
             console.log('Token expired, refreshing...');
-            const refreshResult = await refreshToken();
+            const refreshResult =
+              await this.nepseAuthService.refreshCredentials(page);
             authToken = refreshResult.token;
-            currentInitialId = refreshResult.initialId;
+            currentInitialId = refreshResult.id;
 
             console.log('Token refreshed successfully');
             console.log('New authToken:', authToken?.substring(0, 20) + '...');
@@ -499,7 +406,7 @@ export class FloorsheetService {
         );
       }
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
     }
   }
 
