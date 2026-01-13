@@ -739,4 +739,14 @@ export class FloorsheetService {
 
     return response;
   }
+  //   async getHoldingOfBroker() {
+  //     const query = sql`SELECT DISTINCT(f.buyer_member_id) AS buyer, ROUND(SUM(f.contract_quantity), 4) total_quantity,
+  // ROUND(AVG(f.contract_rate), 4) average_rate, ROUND(AVG(f.contract_amount), 4) average_amount
+  // FROM floorsheet f
+  // INNER JOIN company c
+  // ON f.stock_symbol = c.symbol
+  // GROUP BY f.buyer_member_id, f.stock_symbol
+  // HAVING f.stock_symbol = 'ADBL'
+  // ORDER BY total_quantity DESC`;
+  //   }
 }

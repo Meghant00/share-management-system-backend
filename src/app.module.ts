@@ -8,6 +8,7 @@ import { BrokerService } from './broker/broker.service';
 import { BrokerController } from './broker/broker.controller';
 import { CompanyController } from './company/company.controller';
 import { CompanyService } from './company/company.service';
+import { NepseAuthService } from './nepseAuth/nepseAuth.service';
 
 @Module({
   imports: [DatabaseModule],
@@ -17,6 +18,12 @@ import { CompanyService } from './company/company.service';
     BrokerController,
     CompanyController,
   ],
-  providers: [AppService, FloorsheetService, BrokerService, CompanyService],
+  providers: [
+    AppService,
+    FloorsheetService,
+    BrokerService,
+    CompanyService,
+    NepseAuthService,
+  ],
 })
 export class AppModule {}

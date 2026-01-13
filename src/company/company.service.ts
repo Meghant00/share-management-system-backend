@@ -1,12 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import * as schema from '../database/schema/company';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import {
-  FloorsheetAuthContext,
-  FloorsheetService,
-} from 'src/floorsheet/floorsheet.service';
+import { FloorsheetService } from 'src/floorsheet/floorsheet.service';
 import { BrowserContext, chromium, Page } from 'playwright';
 import { eq } from 'drizzle-orm';
+import {
+  NepseAuthService,
+  NepseAuthContext,
+} from 'src/nepseAuth/nepseAuth.service';
 
 interface Company {
   companyId: number;
@@ -32,7 +33,7 @@ export interface CompanyResult {
 export class CompanyService {
   constructor(
     @Inject('DB') private db: NodePgDatabase<typeof schema>,
-    private readonly floorsheetService: FloorsheetService,
+    private readonly nepseAuthService: NepseAuthService,
   ) {}
 
   async fetchAndSaveCompanies(): Promise<CompanyResult> {
@@ -51,8 +52,7 @@ export class CompanyService {
     const page = await context.newPage();
 
     try {
-      const authContext =
-        await this.floorsheetService.initializeAndAuthenticate(page);
+      const authContext = await this.nepseAuthService.getCredentials(page);
 
       const companiesData = await this.fetchCompanies(context, authContext);
 
@@ -79,13 +79,13 @@ export class CompanyService {
 
   private async fetchCompanies(
     context: BrowserContext,
-    authContext: FloorsheetAuthContext,
+    authContext: NepseAuthContext,
   ): Promise<any> {
     const res = await context.request.get(
       'https://nepalstock.com/api/nots/company/list',
       {
         headers: {
-          Authorization: authContext.authToken,
+          Authorization: authContext.token,
           'Content-Type': 'application/json',
         },
       },
@@ -98,13 +98,13 @@ export class CompanyService {
 
   private async fetchSecurities(
     context: BrowserContext,
-    authContext: FloorsheetAuthContext,
+    authContext: NepseAuthContext,
   ): Promise<any> {
     const res = await context.request.get(
       'https://www.nepalstock.com/api/nots/security?nonDelisted=true',
       {
         headers: {
-          Authorization: authContext.authToken,
+          Authorization: authContext.token,
           'Content-Type': 'application/json',
         },
       },
