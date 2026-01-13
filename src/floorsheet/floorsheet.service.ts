@@ -13,6 +13,7 @@ import {
   NepseAuthContext,
   NepseAuthService,
 } from 'src/nepseAuth/nepseAuth.service';
+import { Observable, Subject } from 'rxjs';
 
 export interface FloorsheetAuthContext {
   authToken: string;
@@ -52,9 +53,23 @@ export interface UniqueCompaniesInFloorsheetResult {
   total: number;
 }
 
+export interface ProgressUpdate {
+  data: {
+    current: number;
+    total: number;
+    percentage: number;
+    message: string;
+  };
+  // Optional SSE fields
+  id?: string;
+  type?: string;
+  retry?: number;
+}
+
 @Injectable()
 export class FloorsheetService {
   private keys;
+  private progressSubject = new Subject<ProgressUpdate>();
   constructor(
     @Inject('DB') private db: NodePgDatabase<typeof schema>,
     private readonly nepseAuthService: NepseAuthService,
@@ -70,6 +85,23 @@ export class FloorsheetService {
       'amount',
       'businessDate',
     ];
+  }
+
+  // 2. Helper to expose the subject as an Observable for the controller
+  getProgressStream(): Observable<ProgressUpdate> {
+    return this.progressSubject.asObservable();
+  }
+
+  // 3. Helper to emit progress
+  private emitProgress(current: number, total: number, message: string) {
+    this.progressSubject.next({
+      data: {
+        current,
+        total,
+        percentage: Math.round((current / total) * 100),
+        message,
+      },
+    });
   }
 
   async fetchAndSaveFloorsheet(): Promise<FloorsheetResult> {
@@ -119,6 +151,9 @@ export class FloorsheetService {
         `✓ Fetched page 1: ${firstPageCount} records, total trades: ${totalTrades}, total pages: ${totalPages}`,
       );
 
+      this.emitProgress(0, totalTrades, 'Starting fetch...');
+      let processedTrades = 0;
+
       await this.fetchRemainingPages(
         page,
         authContext,
@@ -126,6 +161,14 @@ export class FloorsheetService {
         totalPages,
         allTrades,
         totalTrades,
+        (count) => {
+          processedTrades += count;
+          this.emitProgress(
+            processedTrades,
+            totalTrades,
+            `Inserted ${processedTrades} trades`,
+          );
+        },
       );
 
       await browser.close();
@@ -254,6 +297,7 @@ export class FloorsheetService {
     totalPages: number,
     allTrades: any[],
     totalTrades: number,
+    onProgress: (insertedCount: number) => void,
   ): Promise<void> {
     let authToken = context.token;
     let currentInitialId = context.id;
@@ -381,12 +425,16 @@ export class FloorsheetService {
         pageData.floorsheets.content.length > 0
       ) {
         const pageCount = pageData.floorsheets.content.length;
+        const batch = pageData.floorsheets.content;
+
         allTrades.push(...pageData.floorsheets.content);
 
         // Insert data into database if it doesn't exist
         await this.insertFloorsheetDataIfNotExists(
           pageData.floorsheets.content,
         );
+
+        onProgress(batch.length);
 
         console.log(
           `✓ Fetched page ${pageNumber + 1}: ${pageCount} records, running total: ${allTrades.length}/${totalTrades}`,

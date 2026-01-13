@@ -5,13 +5,16 @@ import {
   UseInterceptors,
   UploadedFile,
   Get,
+  Sse,
 } from '@nestjs/common';
 import {
   FloorsheetResult,
   FloorsheetService,
+  ProgressUpdate,
   SaveFloorsheetCsvResult,
 } from './floorsheet.service';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Observable } from 'rxjs';
 
 interface FloorsheetSaveCSVDao {
   csvFile: FormData;
@@ -38,5 +41,10 @@ export class FloorsheetController {
   @Get('traded-companies')
   async getListOfTradedCompanies() {
     return this.floorsheetService.getUniqueCompaniesInFloorsheet();
+  }
+
+  @Sse('progress')
+  sendProgress(): Observable<ProgressUpdate> {
+    return this.floorsheetService.getProgressStream();
   }
 }
