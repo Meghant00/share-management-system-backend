@@ -2,6 +2,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Inject,
+  ConflictException,
 } from '@nestjs/common';
 import { chromium, Page } from 'playwright';
 import * as fs from 'fs';
@@ -70,6 +71,7 @@ export interface ProgressUpdate {
 export class FloorsheetService {
   private keys;
   private progressSubject = new Subject<ProgressUpdate>();
+  private isProcessing = false;
   constructor(
     @Inject('DB') private db: NodePgDatabase<typeof schema>,
     private readonly nepseAuthService: NepseAuthService,
@@ -105,6 +107,13 @@ export class FloorsheetService {
   }
 
   async fetchAndSaveFloorsheet(): Promise<FloorsheetResult> {
+    if (this.isProcessing) {
+      throw new ConflictException(
+        'A floorsheet sync is already in progress. Please wait for it to complete.',
+      );
+    }
+
+    this.isProcessing = true;
     const allTrades: any[] = [];
 
     const browser = await chromium.launch({
@@ -173,8 +182,11 @@ export class FloorsheetService {
 
       await browser.close();
 
+      this.isProcessing = false;
+
       return { totalTrades: allTrades.length };
     } catch (error) {
+      this.isProcessing = false;
       console.error('Floorsheet fetch failed', error);
       await browser.close();
       if (error instanceof InternalServerErrorException) {
