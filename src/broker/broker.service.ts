@@ -53,13 +53,11 @@ export class BrokerService {
 
       console.log('Authenticated');
 
-      console.log('Auth context:', authContext);
-
       const brokersData = await this.fetchBrokers(page, authContext);
 
-      console.log('Brokers:', brokersData);
-
       const brokers = brokersData.content;
+
+      console.log('Brokers:', brokers.length);
 
       const saveData = await this.saveBrokers(brokers);
 
