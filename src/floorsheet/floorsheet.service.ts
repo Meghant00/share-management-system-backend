@@ -149,6 +149,14 @@ export class FloorsheetService {
         throw new InternalServerErrorException('No floorsheet data returned');
       }
 
+      const firstContent = firstPageData.floorsheets.content[0];
+
+      if (!firstContent.buyerMemberId) {
+        throw new InternalServerErrorException(
+          'Floorsheet not updated. Please try again after market closes.',
+        );
+      }
+
       // Add first page data to allTrades
       const firstPageCount = firstPageData.floorsheets.content.length;
 
