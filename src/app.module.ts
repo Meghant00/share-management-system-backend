@@ -9,6 +9,8 @@ import { BrokerController } from './broker/broker.controller';
 import { CompanyController } from './company/company.controller';
 import { CompanyService } from './company/company.service';
 import { NepseAuthService } from './nepseAuth/nepseAuth.service';
+import { ReportController } from './report/report.controller';
+import { ReportService } from './report/report.service';
 
 @Module({
   imports: [DatabaseModule],
@@ -17,6 +19,7 @@ import { NepseAuthService } from './nepseAuth/nepseAuth.service';
     FloorsheetController,
     BrokerController,
     CompanyController,
+    ReportController,
   ],
   providers: [
     AppService,
@@ -24,6 +27,7 @@ import { NepseAuthService } from './nepseAuth/nepseAuth.service';
     BrokerService,
     CompanyService,
     NepseAuthService,
+    ReportService,
   ],
 })
 export class AppModule {}
