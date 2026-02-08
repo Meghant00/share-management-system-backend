@@ -118,6 +118,7 @@ export class CompanyService {
     const parsedCompanies: Company[] = companies.map((company) => {
       const tempCompany = {
         ...company,
+        companyName: company.securityName,
         companyId: company.id,
       };
 
