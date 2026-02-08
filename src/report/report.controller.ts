@@ -11,4 +11,11 @@ export class ReportController {
 
     return this.reportService.getTotalHoldingsOfBrokerByCompany(company);
   }
+
+  @Get('/get-broker-selling/:company')
+  public getTotalSellingOfBrokerByCompany(@Param() param) {
+    const { company } = param;
+
+    return this.reportService.getTotalSellingOfBrokerByCompany(company);
+  }
 }

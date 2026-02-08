@@ -10,7 +10,8 @@ export interface HoldingResult {
 }
 
 interface HolderResult {
-  buyer: number;
+  buyer?: number;
+  seller?: number;
   totalQuantity: number;
   averageRate: number;
   averageAmount: number;
@@ -43,6 +44,39 @@ export class ReportService {
       (holder: any, index: number) => {
         return {
           buyer: holder.buyer,
+          totalQuantity: Number(holder.total_quantity),
+          averageRate: Number(holder.average_rate),
+          averageAmount: Number(holder.average_amount),
+          sn: index + 1,
+        };
+      },
+    );
+
+    return { total: total || 0, holders: parsedHolders };
+  }
+
+  public async getTotalSellingOfBrokerByCompany(
+    stockSymbol: string,
+  ): Promise<HoldingResult> {
+    const query = sql`SELECT DISTINCT(f.seller_member_id) AS seller, ROUND(SUM(f.contract_quantity), 4) total_quantity,
+                        ROUND(AVG(f.contract_rate), 4) average_rate, ROUND(AVG(f.contract_amount), 4) average_amount
+                        FROM floorsheet f
+                        INNER JOIN company c
+                        ON f.stock_symbol = c.symbol
+                        GROUP BY f.seller_member_id, f.stock_symbol
+                        HAVING f.stock_symbol = UPPER(${stockSymbol})
+                        ORDER BY total_quantity DESC`;
+
+    const result = await db.execute(query);
+
+    const total = result.rowCount;
+
+    const data = result.rows;
+
+    const parsedHolders: HolderResult[] = data.map(
+      (holder: any, index: number) => {
+        return {
+          seller: holder.seller,
           totalQuantity: Number(holder.total_quantity),
           averageRate: Number(holder.average_rate),
           averageAmount: Number(holder.average_amount),
