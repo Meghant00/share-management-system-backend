@@ -1,4 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { db } from 'src/database/database';
 import * as schema from '../database/schema/floorsheet';
@@ -24,15 +29,35 @@ export class ReportService {
 
   public async getTotalHoldingsOfBrokerByCompany(
     stockSymbol: string,
+    fromDate?: string,
+    toDate?: string,
   ): Promise<HoldingResult> {
-    const query = sql`SELECT DISTINCT(f.buyer_member_id) AS buyer, ROUND(SUM(f.contract_quantity), 4) total_quantity,
-                        ROUND(AVG(f.contract_rate), 4) average_rate, ROUND(AVG(f.contract_amount), 4) average_amount
-                        FROM floorsheet f
-                        INNER JOIN company c
-                        ON f.stock_symbol = c.symbol
-                        GROUP BY f.buyer_member_id, f.stock_symbol
-                        HAVING f.stock_symbol = UPPER(${stockSymbol})
-                        ORDER BY total_quantity DESC`;
+    const fromDateTimestamp = new Date(fromDate || 0).getTime();
+    const toDateTimeStamp = toDate ? new Date(toDate).getTime() : Date.now();
+
+    if (toDateTimeStamp < fromDateTimestamp) {
+      console.log('From should be less than to date.');
+      throw new UnprocessableEntityException(
+        'From should be less than to date.',
+      );
+    }
+
+    const query = sql`SELECT 
+                          f.buyer_member_id AS buyer,
+                          ROUND(SUM(f.contract_quantity), 4) AS total_quantity,
+                          ROUND(AVG(f.contract_rate), 4) AS average_rate,
+                          ROUND(AVG(f.contract_amount), 4) AS average_amount
+                      FROM floorsheet f
+                      INNER JOIN company c
+                          ON f.stock_symbol = c.symbol
+                      WHERE 
+                          f.stock_symbol = UPPER(${stockSymbol})
+                          AND f.business_date BETWEEN TO_TIMESTAMP(${fromDateTimestamp} / 1000.00)::date AND TO_TIMESTAMP(${toDateTimeStamp} / 1000.00)::date
+                      GROUP BY 
+                          f.buyer_member_id, 
+                          f.stock_symbol
+                      ORDER BY 
+                          total_quantity DESC;`;
 
     const result = await db.execute(query);
 
@@ -57,15 +82,35 @@ export class ReportService {
 
   public async getTotalSellingOfBrokerByCompany(
     stockSymbol: string,
+    fromDate?: string,
+    toDate?: string,
   ): Promise<HoldingResult> {
-    const query = sql`SELECT DISTINCT(f.seller_member_id) AS seller, ROUND(SUM(f.contract_quantity), 4) total_quantity,
-                        ROUND(AVG(f.contract_rate), 4) average_rate, ROUND(AVG(f.contract_amount), 4) average_amount
-                        FROM floorsheet f
-                        INNER JOIN company c
-                        ON f.stock_symbol = c.symbol
-                        GROUP BY f.seller_member_id, f.stock_symbol
-                        HAVING f.stock_symbol = UPPER(${stockSymbol})
-                        ORDER BY total_quantity DESC`;
+    const fromDateTimestamp = new Date(fromDate || 0).getTime();
+    const toDateTimeStamp = toDate ? new Date(toDate).getTime() : Date.now();
+
+    if (toDateTimeStamp < fromDateTimestamp) {
+      console.log('From should be less than to date.');
+      throw new UnprocessableEntityException(
+        'From should be less than to date.',
+      );
+    }
+
+    const query = sql`SELECT 
+                          f.seller_member_id AS seller,
+                          ROUND(SUM(f.contract_quantity), 4) AS total_quantity,
+                          ROUND(AVG(f.contract_rate), 4) AS average_rate,
+                          ROUND(AVG(f.contract_amount), 4) AS average_amount
+                      FROM floorsheet f
+                      INNER JOIN company c
+                          ON f.stock_symbol = c.symbol
+                      WHERE 
+                          f.stock_symbol = UPPER(${stockSymbol})
+                          AND f.business_date BETWEEN TO_TIMESTAMP(${fromDateTimestamp} / 1000.00)::date AND TO_TIMESTAMP(${toDateTimeStamp} / 1000.00)::date
+                      GROUP BY 
+                          f.seller_member_id, 
+                          f.stock_symbol
+                      ORDER BY 
+                          total_quantity DESC;`;
 
     const result = await db.execute(query);
 
