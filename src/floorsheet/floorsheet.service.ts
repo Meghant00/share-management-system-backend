@@ -15,6 +15,8 @@ import {
   NepseAuthService,
 } from 'src/nepseAuth/nepseAuth.service';
 import { Observable, Subject } from 'rxjs';
+import { CompanyService } from 'src/company/company.service';
+import { BrokerService } from 'src/broker/broker.service';
 
 export interface FloorsheetAuthContext {
   authToken: string;
@@ -75,6 +77,8 @@ export class FloorsheetService {
   constructor(
     @Inject('DB') private db: NodePgDatabase<typeof schema>,
     private readonly nepseAuthService: NepseAuthService,
+    private readonly companyService: CompanyService,
+    private readonly brokerService: BrokerService,
   ) {
     this.keys = [
       'sn',
@@ -541,7 +545,23 @@ export class FloorsheetService {
       }
     } catch (error) {
       console.error('Error inserting floorsheet data:', error);
-      // Don't throw error, just log it so the process continues
+
+      if (error?.cause?.constraint) {
+        // Add companies and brokers if they do not exist
+
+        const constraint = error.cause.constraint;
+
+        if (constraint === 'floorsheet_stock_symbol_fk') {
+          await this.companyService.fetchAndSaveCompanies();
+          this.insertFloorsheetDataIfNotExists(trades);
+        } else if (
+          constraint === 'buyer_member_id_fk' ||
+          constraint === 'floorsheet_seller_member_id_fk'
+        ) {
+          await this.brokerService.fetchAndSaveBrokers();
+          this.insertFloorsheetDataIfNotExists(trades);
+        }
+      }
     }
   }
 
