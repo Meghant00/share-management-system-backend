@@ -52,7 +52,7 @@ export class ReportService {
                           ON f.stock_symbol = c.symbol
                       WHERE 
                           f.stock_symbol = UPPER(${stockSymbol})
-                          AND f.business_date BETWEEN TO_TIMESTAMP(${fromDateTimestamp} / 1000.00)::date AND TO_TIMESTAMP(${toDateTimeStamp} / 1000.00)::date
+                          AND f.business_date >= TO_TIMESTAMP(${fromDateTimestamp} / 1000.00)::date AND f.business_date < TO_TIMESTAMP(${toDateTimeStamp} / 1000.00)::date
                       GROUP BY 
                           f.buyer_member_id, 
                           f.stock_symbol
@@ -105,7 +105,7 @@ export class ReportService {
                           ON f.stock_symbol = c.symbol
                       WHERE 
                           f.stock_symbol = UPPER(${stockSymbol})
-                          AND f.business_date BETWEEN TO_TIMESTAMP(${fromDateTimestamp} / 1000.00)::date AND TO_TIMESTAMP(${toDateTimeStamp} / 1000.00)::date
+                          AND f.business_date >= TO_TIMESTAMP(${fromDateTimestamp} / 1000.00)::date AND f.business_date < TO_TIMESTAMP(${toDateTimeStamp} / 1000.00)::date
                       GROUP BY 
                           f.seller_member_id, 
                           f.stock_symbol
