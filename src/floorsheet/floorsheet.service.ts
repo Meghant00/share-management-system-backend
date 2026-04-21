@@ -104,7 +104,7 @@ export class FloorsheetService {
       data: {
         current,
         total,
-        percentage: Math.round((current / total) * 100),
+        percentage: Math.floor((current / total) * 100),
         message,
       },
     });
@@ -325,10 +325,6 @@ export class FloorsheetService {
   ): Promise<void> {
     let authToken = context.token;
     let currentInitialId = context.id;
-
-    console.log('Starting fetchRemainingPages');
-    console.log('Initial authToken:', authToken?.substring(0, 20) + '...');
-    console.log('Initial initialId:', currentInitialId);
 
     // First page is already fetched separately; start from page 2
     for (let pageNumber = 0; pageNumber < totalPages; pageNumber++) {
