@@ -664,7 +664,7 @@ export class FloorsheetService {
         stockSymbol: tempTransaction.stockSymbol,
         contractQuantity: tempTransaction.quantity,
         contractRate: tempTransaction.rate,
-        contractAmount: tempTransaction.contractAmount,
+        contractAmount: tempTransaction.amount,
         buyerMemberId: tempTransaction.buyerId,
         sellerMemberId: tempTransaction.sellerId,
         businessDate: tempTransaction.businessDate,
