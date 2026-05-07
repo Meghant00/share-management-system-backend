@@ -68,7 +68,7 @@ export class NepseAuthService {
       this.initialId = result.id;
 
       return result;
-    } catch (error) {
+    } catch (error: any) {
       throw new InternalServerErrorException(
         `Failed to refresh token: ${error.message}`,
       );

@@ -2,7 +2,7 @@ import { pgTable, integer, varchar } from 'drizzle-orm/pg-core';
 
 export const company = pgTable('company', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-  companyId: integer('companyId'),
+  companyId: integer('companyId').unique(),
   companyName: varchar('company_name', { length: 255 }).notNull(),
   symbol: varchar('symbol', { length: 20 }).notNull().unique(),
   securityName: varchar('security_name', { length: 255 }).notNull(),

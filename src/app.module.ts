@@ -11,6 +11,8 @@ import { CompanyService } from './company/company.service';
 import { NepseAuthService } from './nepseAuth/nepseAuth.service';
 import { ReportController } from './report/report.controller';
 import { ReportService } from './report/report.service';
+import { TodaysPriceController } from './todaysPrice/todaysPrice.controller';
+import { TodaysPriceService } from './todaysPrice/todaysPrice.service';
 
 @Module({
   imports: [DatabaseModule],
@@ -20,6 +22,7 @@ import { ReportService } from './report/report.service';
     BrokerController,
     CompanyController,
     ReportController,
+    TodaysPriceController,
   ],
   providers: [
     AppService,
@@ -28,6 +31,7 @@ import { ReportService } from './report/report.service';
     CompanyService,
     NepseAuthService,
     ReportService,
+    TodaysPriceService
   ],
 })
 export class AppModule {}
