@@ -54,10 +54,10 @@ export class NepseAuthService {
     });
 
     try {
-      if (page.url().includes('nepalstock.com.np')) {
+      if (page.url().includes('nepalstock.com')) {
         await page.reload({ waitUntil: 'networkidle' });
       } else {
-        await page.goto('https://nepalstock.com.np/floor-sheet', {
+        await page.goto('https://nepalstock.com/floor-sheet', {
           waitUntil: 'networkidle',
         });
       }

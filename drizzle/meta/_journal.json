@@ -15,6 +15,20 @@
       "when": 1778139004083,
       "tag": "0001_reflective_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778224319137,
+      "tag": "0002_loud_living_tribunal",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778227230030,
+      "tag": "0003_military_chamber",
+      "breakpoints": true
     }
   ]
 }

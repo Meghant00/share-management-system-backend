@@ -15,48 +15,59 @@ export const priceHistory = pgTable(
     businessDate: date('business_date').notNull(),
     securityId: integer('security_id').notNull(),
     openPrice: decimal('open_price', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }).notNull(),
     highPrice: decimal('high_price', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }).notNull(),
     closePrice: decimal('close_price', {
-      scale: 18,
-      precision: 2,
-    }).notNull(),
+      scale: 2,
+      precision: 18,
+      mode: 'number',
+    }),
     totalTradeQuantity: decimal('total_trade_quantity', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }),
     totalTradeValue: decimal('total_trade_value', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }),
     previousDayClosePrice: decimal('previous_day_close_price', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }),
     fiftyTwoWeekHigh: decimal('fifty_two_week_high', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }),
     fiftyTwoWeekLow: decimal('fifty_two_week_low', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }),
     totalTrades: decimal('total_trades', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }),
     averageTradePrice: decimal('average_trade_price', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }),
     marketCapitalization: decimal('market_capitalization', {
-      scale: 18,
-      precision: 2,
+      scale: 2,
+      precision: 18,
+      mode: 'number',
     }),
   },
   (table) => ({
@@ -67,3 +78,5 @@ export const priceHistory = pgTable(
     }),
   }),
 );
+
+export type NewPriceHistory = typeof priceHistory.$inferInsert;
