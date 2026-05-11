@@ -1,93 +1,140 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-
 import * as schema from '../database/schema/priceHistory';
-import { BrowserContext, chromium, Page } from 'playwright';
 import {
   NepseAuthContext,
   NepseAuthService,
 } from 'src/nepseAuth/nepseAuth.service';
-import { and, eq } from 'drizzle-orm';
+import { BrowserContext, Page } from 'playwright';
+import { PlayWrightService } from 'src/playWright/playWright.service';
 import { sleep } from 'utils/sleep';
+import { getDatesBetweenTwoDates } from 'utils/date';
+import { and, eq } from 'drizzle-orm';
 
-export interface SaveTodaysPriceInPriceHistoryResponse {
+export interface FetchPriceHistoryByFromAndToDateParameters {
+  fromDate: string;
+  toDate?: string;
+}
+
+interface FetchPriceHistoryByFromAndToDateFromNepseParameters {
+  fromDate: string;
+  toDate?: string;
+  page: Page;
+  context: BrowserContext;
+  authContext: NepseAuthContext;
+}
+
+interface FetchPriceHistoryFromNepseParameters {
+  playwrightPage: Page;
+  context: BrowserContext;
+  authContext: NepseAuthContext;
+  businessDate: number;
+}
+
+export interface SavePriceHistoryResponse {
   total: number;
   inserted: number;
   updated: number;
 }
 
-export interface FetchAndSaveTodaysPriceError {
-  message: string;
-  success: boolean;
-  errorCode?: number;
-}
-
 @Injectable()
-export class TodaysPriceService {
+export class PriceHistoryService {
   constructor(
     @Inject('DB') private db: NodePgDatabase<typeof schema>,
     private readonly nepseAuthService: NepseAuthService,
+    private readonly playWrightService: PlayWrightService,
   ) {}
 
-  public async fetchAndSaveTodaysPrice(): Promise<
-    SaveTodaysPriceInPriceHistoryResponse | FetchAndSaveTodaysPriceError
-  > {
+  public async fetchAndSavePriceHistoryByFromDateAndToDate({
+    fromDate,
+    toDate,
+  }: FetchPriceHistoryByFromAndToDateParameters) {
     try {
-      const browser = await chromium.launch({
-        headless: true,
-        args: ['--disable-blink-features=AutomationControlled'],
-      });
-
-      const context = await browser.newContext({
-        ignoreHTTPSErrors: true,
-        userAgent:
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      });
-
-      const page = await context.newPage();
-
       console.log('Fetching todays price...');
+
+      const { browser, context, page } =
+        await this.playWrightService.initializeBrowserContext();
 
       const authContext = await this.nepseAuthService.getCredentials(page);
 
-      const todaysPrice: any[] = await this.fetchTodaysPrice(
-        context,
-        page,
-        authContext,
-      );
+      const priceHistory: any[] =
+        await this.fetchPriceHistoryByFromAndToDateFromNepse({
+          authContext,
+          page,
+          fromDate,
+          toDate,
+          context,
+        });
 
-      const saveResponse =
-        await this.saveTodaysPriceInPriceHistory(todaysPrice);
+      const saveResponse = await this.savePriceHistory(priceHistory);
 
       return saveResponse;
     } catch (error) {
       console.log(error);
 
-      return {
-        message: 'An error occurred while inserting',
-        success: false,
-      };
+      return [];
     }
   }
 
-  private async fetchTodaysPrice(
-    context: BrowserContext,
-    playwrightPage: Page,
-    authContext: NepseAuthContext,
-  ) {
+  private async fetchPriceHistoryByFromAndToDateFromNepse({
+    fromDate,
+    toDate,
+    context,
+    page,
+    authContext,
+  }: FetchPriceHistoryByFromAndToDateFromNepseParameters) {
+    console.log('Parsing Dates...');
+
+    const datesBetweenFromDateAndToDate: number[] = getDatesBetweenTwoDates({
+      fromDate,
+      toDate,
+    });
+
+    console.log('Dates parsed');
+
+    console.log('Fetching Price History....');
+
+    const priceHistory: any[] = [];
+
+    for (const date of datesBetweenFromDateAndToDate) {
+      const priceHistoryRes = await this.fetchPriceHistoryFromNepse({
+        authContext: authContext,
+        context: context,
+        playwrightPage: page,
+        businessDate: date,
+      });
+
+      priceHistory.push(...priceHistoryRes);
+
+      await sleep(500);
+    }
+
+    console.log('Fetched Price History..');
+
+    return priceHistory;
+  }
+
+  private async fetchPriceHistoryFromNepse({
+    authContext,
+    businessDate,
+    context,
+    playwrightPage,
+  }: FetchPriceHistoryFromNepseParameters) {
     try {
       let usedAuthContext = authContext;
 
       const LIMIT = 500;
 
-      const date = new Date();
+      const date = new Date(businessDate);
       const formattedBusinessDate = new Intl.DateTimeFormat('en-CA', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
       }).format(date);
 
-      const todaysPrice: any[] = [];
+      const priceHistory: any[] = [];
+
+      console.log(`Fetching Price History for ${formattedBusinessDate}`);
 
       const firstPageResponse = await context.request.post(
         `https://www.nepalstock.com/api/nots/nepse-data/today-price`,
@@ -111,10 +158,13 @@ export class TodaysPriceService {
 
       const firstPageContent: any[] = firstPagedata.content;
 
-      todaysPrice.push(...firstPageContent);
+      priceHistory.push(...firstPageContent);
 
       if (firstPageContent.length < LIMIT) {
-        return todaysPrice;
+        console.log(
+          `Fetched Price History for ${formattedBusinessDate}. Total ${priceHistory.length} data.`,
+        );
+        return priceHistory;
       }
 
       for (let i = 1; i < firstPagedata.totalPages; i++) {
@@ -122,7 +172,7 @@ export class TodaysPriceService {
           try {
             console.log(`Fetching Page ${i}`);
 
-            const todaysPriceRes = await context.request.post(
+            const priceHistoryRes = await context.request.post(
               `https://www.nepalstock.com/api/nots/nepse-data/today-price`,
               {
                 headers: {
@@ -140,11 +190,11 @@ export class TodaysPriceService {
               },
             );
 
-            const todaysPriceData = await todaysPriceRes.json();
+            const priceHistoryData = await priceHistoryRes.json();
 
-            const content: any[] = todaysPriceData.content;
+            const content: any[] = priceHistoryData.content;
 
-            todaysPrice.push(...content);
+            priceHistory.push(...content);
 
             console.log(`Fetched Page ${i}. Total companies ${content.length}`);
 
@@ -172,20 +222,24 @@ export class TodaysPriceService {
         }
       }
 
-      return todaysPrice;
+      console.log(
+        `Fetched Price History for ${formattedBusinessDate}. Total ${priceHistory.length} data.`,
+      );
+
+      return priceHistory;
     } catch (error) {
       console.log(error);
       return [];
     }
   }
 
-  private async saveTodaysPriceInPriceHistory(
-    todaysPrice: any[],
-  ): Promise<SaveTodaysPriceInPriceHistoryResponse> {
+  private async savePriceHistory(
+    priceHistory: any[],
+  ): Promise<SavePriceHistoryResponse> {
     console.log('saving todays price');
 
-    const parsedDataForPriceHistory: schema.NewPriceHistory[] = todaysPrice.map(
-      (company) => {
+    const parsedDataForPriceHistory: schema.NewPriceHistory[] =
+      priceHistory.map((company) => {
         return {
           businessDate: company.businessDate,
           securityId: company.securityId,
@@ -201,8 +255,7 @@ export class TodaysPriceService {
           totalTrades: company.totalTrades,
           totalTradeValue: company.totalTradeValue,
         };
-      },
-    );
+      });
 
     let insertedDataInPriceHistory = 0;
     let updatedDataInPriceHistory = 0;
@@ -243,7 +296,7 @@ export class TodaysPriceService {
       }
     }
 
-    console.log('saved todays price');
+    console.log('saved price history');
 
     return {
       total: parsedDataForPriceHistory.length,
