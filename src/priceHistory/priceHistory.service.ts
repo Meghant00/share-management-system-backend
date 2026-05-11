@@ -246,14 +246,14 @@ export class PriceHistoryService {
           openPrice: company.openPrice,
           highPrice: company.highPrice,
           closePrice: company.closePrice,
-          averageTradePrice: company.averageTradePrice,
+          averageTradePrice: company.averageTradedPrice,
           fiftyTwoWeekHigh: company.fiftyTwoWeekHigh,
           fiftyTwoWeekLow: company.fiftyTwoWeekLow,
           marketCapitalization: company.marketCapitalization,
           previousDayClosePrice: company.previousDayClosePrice,
-          totalTradeQuantity: company.totalTradeQuantity,
+          totalTradeQuantity: company.totalTradedQuantity,
           totalTrades: company.totalTrades,
-          totalTradeValue: company.totalTradeValue,
+          totalTradeValue: company.totalTradedValue,
         };
       });
 
