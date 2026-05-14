@@ -37,6 +37,12 @@ export interface SavePriceHistoryResponse {
   updated: number;
 }
 
+export interface FetchAndSavePriceHistoryError {
+  message: string;
+  success: boolean;
+  errorCode?: number;
+}
+
 @Injectable()
 export class PriceHistoryService {
   constructor(
@@ -48,9 +54,11 @@ export class PriceHistoryService {
   public async fetchAndSavePriceHistoryByFromDateAndToDate({
     fromDate,
     toDate,
-  }: FetchPriceHistoryByFromAndToDateParameters) {
+  }: FetchPriceHistoryByFromAndToDateParameters): Promise<
+    SavePriceHistoryResponse | FetchAndSavePriceHistoryError
+  > {
     try {
-      console.log('Fetching todays price...');
+      console.log('Fetching price history...');
 
       const { browser, context, page } =
         await this.playWrightService.initializeBrowserContext();
@@ -72,7 +80,10 @@ export class PriceHistoryService {
     } catch (error) {
       console.log(error);
 
-      return [];
+      return {
+        success: false,
+        message: 'Error fetching price history',
+      };
     }
   }
 
