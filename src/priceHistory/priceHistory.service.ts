@@ -60,7 +60,21 @@ export class PriceHistoryService {
     try {
       console.log('Fetching price history...');
 
-      const { browser, context, page } =
+      if (!fromDate) {
+        return {
+          success: false,
+          message: 'From date is required',
+        };
+      }
+
+      if (toDate && new Date(toDate).getTime() > Date.now()) {
+        return {
+          success: false,
+          message: 'To date should be less than current time',
+        };
+      }
+
+      const { context, page } =
         await this.playWrightService.initializeBrowserContext();
 
       const authContext = await this.nepseAuthService.getCredentials(page);
@@ -247,7 +261,7 @@ export class PriceHistoryService {
   private async savePriceHistory(
     priceHistory: any[],
   ): Promise<SavePriceHistoryResponse> {
-    console.log('saving todays price');
+    console.log('saving price history');
 
     const parsedDataForPriceHistory: schema.NewPriceHistory[] =
       priceHistory.map((company) => {
