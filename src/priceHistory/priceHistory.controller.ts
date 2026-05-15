@@ -1,5 +1,6 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { PriceHistoryService } from './priceHistory.service';
+import { PriceHistoryPeriod } from './priceHistory.interface';
 
 @Controller('price-history')
 export class PriceHistoryController {
@@ -26,5 +27,31 @@ export class PriceHistoryController {
         toDate: toDate,
       },
     );
+  }
+
+  @Get(':symbol')
+  public fetchPriceHistoryOfCompanyBySymbol(@Param() param, @Query() query) {
+    const symbol = param.symbol;
+
+    let fromDate = query.fromDate;
+    let toDate = query.toDate;
+
+    const period: PriceHistoryPeriod = query.period;
+
+    if ((fromDate && !toDate) || (!fromDate && toDate)) {
+      return {
+        message: 'From date and To date are required.',
+      };
+    }
+
+    if (!fromDate && !toDate) {
+    }
+
+    return {
+      symbol,
+      fromDate,
+      toDate,
+      period,
+    };
   }
 }
