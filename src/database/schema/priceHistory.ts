@@ -7,7 +7,7 @@ import { pgTable } from 'drizzle-orm/pg-core';
 import { company } from './company';
 
 export const priceHistory = pgTable(
-  'priceHistory',
+  'price_history',
   {
     id: bigint('id', { mode: 'number' })
       .primaryKey()
