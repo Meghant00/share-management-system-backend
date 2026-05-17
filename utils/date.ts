@@ -27,3 +27,15 @@ export const getDatesBetweenTwoDates = ({
 
   return datesBetweenFromDateAndToDate;
 };
+
+export const formatDateInDDMMYYYY = (date: Date | string) => {
+  const tempDate = new Date(date);
+
+  const formattedDate = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(tempDate);
+
+  return formattedDate;
+};

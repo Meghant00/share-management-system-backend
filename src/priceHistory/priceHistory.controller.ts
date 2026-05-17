@@ -1,6 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { PriceHistoryService } from './priceHistory.service';
-import { PriceHistoryPeriod } from './priceHistory.interface';
+import {
+  PRICE_HISTORY_PERIODS,
+  PriceHistoryPeriod,
+} from './priceHistory.interface';
+import { getFromDateAndToDateFromPriceHistoryPeriod } from 'utils/priceHistory';
 
 @Controller('price-history')
 export class PriceHistoryController {
@@ -41,10 +45,30 @@ export class PriceHistoryController {
     if ((fromDate && !toDate) || (!fromDate && toDate)) {
       return {
         message: 'From date and To date are required.',
+        error: true,
       };
     }
 
     if (!fromDate && !toDate) {
+      if (!period) {
+        return {
+          message: 'Period or From Date and To Date is required.',
+          error: true,
+        };
+      }
+
+      if (!PRICE_HISTORY_PERIODS.includes(period)) {
+        return {
+          message: 'Invalid period. Please enter a valid period.',
+          error: true,
+        };
+      }
+
+      const { fromDate: periodFromDate, toDate: periodToDate } =
+        getFromDateAndToDateFromPriceHistoryPeriod(period);
+
+      fromDate = periodFromDate;
+      toDate = periodToDate;
     }
 
     return {
