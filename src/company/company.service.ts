@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import * as schema from '../database/schema/company';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { BrowserContext, chromium, Page } from 'playwright';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   NepseAuthService,
   NepseAuthContext,
@@ -211,5 +211,14 @@ export class CompanyService {
     console.log(`Fetched ${result.length} companies`);
 
     return result;
+  }
+
+  public async getCompanyIdFromSymbol(symbol: string) {
+    const company = await this.db
+      .select({ companyId: schema.company.companyId })
+      .from(schema.company)
+      .where(eq(sql`LOWER(${schema.company.symbol})`, symbol.toLowerCase()));
+
+    return company[0];
   }
 }

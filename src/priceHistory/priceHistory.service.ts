@@ -8,8 +8,9 @@ import {
 import { BrowserContext, Page } from 'playwright';
 import { PlayWrightService } from 'src/playWright/playWright.service';
 import { sleep } from 'utils/sleep';
-import { getDatesBetweenTwoDates } from 'utils/date';
-import { and, eq } from 'drizzle-orm';
+import { formatDateInDDMMYYYY, getDatesBetweenTwoDates } from 'utils/date';
+import { and, eq, sql } from 'drizzle-orm';
+import { CompanyService } from 'src/company/company.service';
 
 export interface FetchPriceHistoryByFromAndToDateParameters {
   fromDate: string;
@@ -43,12 +44,34 @@ export interface FetchAndSavePriceHistoryError {
   errorCode?: number;
 }
 
+export interface GetPriceHistoryOfCompanyByFromDateAndToDateParameters {
+  fromDate: Date;
+  toDate: Date;
+  symbol: string;
+}
+
+interface PriceHistory {
+  closePrice: number;
+  timestamp: number;
+  businessDate: string;
+  totalTradeQuantity: number;
+  totalTradeValue: number;
+}
+
+export interface GetPriceHistoryOfCompanyByFromDateAndToDateResponse {
+  message: string;
+  error?: boolean;
+  success?: boolean;
+  data?: PriceHistory[];
+}
+
 @Injectable()
 export class PriceHistoryService {
   constructor(
     @Inject('DB') private db: NodePgDatabase<typeof schema>,
     private readonly nepseAuthService: NepseAuthService,
     private readonly playWrightService: PlayWrightService,
+    private readonly companyService: CompanyService,
   ) {}
 
   public async fetchAndSavePriceHistoryByFromDateAndToDate({
@@ -327,6 +350,90 @@ export class PriceHistoryService {
       total: parsedDataForPriceHistory.length,
       inserted: insertedDataInPriceHistory,
       updated: updatedDataInPriceHistory,
+    };
+  }
+
+  public async getPriceHistoryOfCompanyByFromDateAndToDate({
+    fromDate,
+    toDate,
+    symbol,
+  }: GetPriceHistoryOfCompanyByFromDateAndToDateParameters): Promise<GetPriceHistoryOfCompanyByFromDateAndToDateResponse> {
+    const currentCompany =
+      await this.companyService.getCompanyIdFromSymbol(symbol);
+
+    if (!currentCompany) {
+      return {
+        message: `Company not found by symbol ${symbol}`,
+        error: true,
+      };
+    }
+
+    if (fromDate > toDate) {
+      return {
+        message: 'From date is greater than to date.',
+        error: true,
+      };
+    }
+
+    const formattedFromDate = formatDateInDDMMYYYY(fromDate);
+    const formattedToDate = formatDateInDDMMYYYY(toDate);
+
+    let query = sql`SELECT ph.close_price AS closePrice, (EXTRACT(EPOCH FROM ph.business_date) * 1000) AS timestamp, 
+                    ph.business_date AS businessDate, ph.total_trade_quantity AS totalTradeQuantity, ph.total_trade_value AS totalTradeValue
+                    FROM price_history ph
+                    WHERE ph.security_id = ${currentCompany.companyId}
+                    AND ph.business_date BETWEEN ${formattedFromDate} AND ${formattedToDate}`;
+
+    const timeDifference = toDate.getTime() - fromDate.getTime();
+
+    const quarterDifference = 1000 * 60 * 60 * 24 * 30 * 3;
+
+    if (timeDifference >= quarterDifference) {
+      query = sql`WITH RankedDates AS (
+                                      SELECT
+                                          business_date,
+                                          -- Extract year and month to group by
+                                          EXTRACT(YEAR FROM business_date) AS yr,
+                                          EXTRACT(MONTH FROM business_date) AS mth,
+                                          -- Chronological rank of the date in that specific month
+                                          DENSE_RANK() OVER(
+                                              PARTITION BY EXTRACT(YEAR FROM business_date), EXTRACT(MONTH FROM business_date)
+                                              ORDER BY business_date ASC
+                                          ) AS date_rank,
+                                          -- Total number of unique dates available in that specific month
+                                          DENSE_RANK() OVER(
+                                              PARTITION BY EXTRACT(YEAR FROM business_date), EXTRACT(MONTH FROM business_date)
+                                              ORDER BY business_date DESC
+                                          ) + DENSE_RANK() OVER(
+                                              PARTITION BY EXTRACT(YEAR FROM business_date), EXTRACT(MONTH FROM business_date)
+                                              ORDER BY business_date ASC
+                                          ) - 1 AS total_unique_dates
+                                      FROM price_history
+                                    WHERE security_id = ${currentCompany.companyId}
+                                    AND business_date BETWEEN ${formattedFromDate} AND ${formattedToDate}
+                                  )
+	
+                                SELECT ph.close_price AS closePrice, (EXTRACT(EPOCH FROM ph.business_date) * 1000) AS timestamp, 
+                                ph.business_date AS businessDate, ph.total_trade_quantity AS totalTradeQuantity, ph.total_trade_value AS totalTradeValue
+                                FROM price_history ph
+                                JOIN RankedDates r
+                                  ON ph.business_date = r.business_date
+                                WHERE ph.security_id = ${currentCompany.companyId}
+                                  AND ph.business_date BETWEEN ${formattedFromDate} AND ${formattedToDate}
+                                  AND (r.date_rank = 1
+                                  OR r.date_rank = r.total_unique_dates
+                                  OR r.date_rank = FLOOR((r.total_unique_dates + 1) / 2))`;
+    }
+
+    const result = await this.db.execute(query);
+
+    const priceHistory: PriceHistory[] =
+      result.rows as unknown as PriceHistory[];
+
+    return {
+      message: `Price history fetched successfully for ${symbol} with id ${currentCompany.companyId}`,
+      success: true,
+      data: priceHistory,
     };
   }
 }

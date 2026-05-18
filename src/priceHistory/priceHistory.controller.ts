@@ -34,7 +34,10 @@ export class PriceHistoryController {
   }
 
   @Get(':symbol')
-  public fetchPriceHistoryOfCompanyBySymbol(@Param() param, @Query() query) {
+  public async fetchPriceHistoryOfCompanyBySymbol(
+    @Param() param,
+    @Query() query,
+  ) {
     const symbol = param.symbol;
 
     let fromDate = query.fromDate;
@@ -69,13 +72,20 @@ export class PriceHistoryController {
 
       fromDate = periodFromDate;
       toDate = periodToDate;
+    } else {
+      fromDate = new Date(query.fromDate);
+      toDate = new Date(query.toDate);
     }
 
-    return {
-      symbol,
-      fromDate,
-      toDate,
-      period,
-    };
+    const priceHistoryResponse =
+      await this.priceHistoryService.getPriceHistoryOfCompanyByFromDateAndToDate(
+        {
+          fromDate,
+          toDate,
+          symbol,
+        },
+      );
+
+    return priceHistoryResponse;
   }
 }
