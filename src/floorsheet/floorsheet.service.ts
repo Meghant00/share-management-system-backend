@@ -4,7 +4,7 @@ import {
   Inject,
   ConflictException,
 } from '@nestjs/common';
-import { chromium, Page } from 'playwright';
+import { BrowserContext, chromium, Page } from 'playwright';
 import * as fs from 'fs';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../database/schema/floorsheet';
@@ -17,6 +17,8 @@ import {
 import { Observable, Subject } from 'rxjs';
 import { CompanyService } from 'src/company/company.service';
 import { BrokerService } from 'src/broker/broker.service';
+import { TodaysPriceService } from 'src/todaysPrice/todaysPrice.service';
+import { PlayWrightService } from 'src/playWright/playWright.service';
 
 export interface FloorsheetAuthContext {
   authToken: string;
@@ -79,6 +81,8 @@ export class FloorsheetService {
     private readonly nepseAuthService: NepseAuthService,
     private readonly companyService: CompanyService,
     private readonly brokerService: BrokerService,
+    private readonly todaysPriceService: TodaysPriceService,
+    private readonly playWrightService: PlayWrightService,
   ) {
     this.keys = [
       'sn',
@@ -120,20 +124,8 @@ export class FloorsheetService {
     this.isProcessing = true;
     const allTrades: any[] = [];
 
-    const browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage',
-        '--no-sandbox',
-      ],
-    });
-    const context = await browser.newContext({
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      viewport: { width: 1920, height: 1080 },
-    });
-    const page = await context.newPage();
+    const { browser, context, page } =
+      await this.playWrightService.initializeBrowserContext();
 
     console.log('Fetching floorsheet...');
 
@@ -142,7 +134,11 @@ export class FloorsheetService {
 
       console.log('Authenticated');
 
-      const firstPageData = await this.fetchFirstPage(page, authContext);
+      const firstPageData = await this.fetchFirstPage(
+        page,
+        authContext,
+        context,
+      );
 
       if (
         !firstPageData ||
@@ -182,6 +178,7 @@ export class FloorsheetService {
         totalPages,
         allTrades,
         totalTrades,
+        context,
         (count) => {
           processedTrades += count;
           this.emitProgress(
@@ -195,6 +192,8 @@ export class FloorsheetService {
       await browser.close();
 
       this.isProcessing = false;
+
+      await this.todaysPriceService.fetchAndSaveTodaysPrice();
 
       return { totalTrades: allTrades.length };
     } catch (error) {
@@ -285,46 +284,38 @@ export class FloorsheetService {
 
   private async fetchFirstPage(
     page: Page,
-    context: NepseAuthContext,
+    authContext: NepseAuthContext,
+    context: BrowserContext,
   ): Promise<any> {
-    const firstPageData: any = await page.evaluate(
-      async ({ token, lastId }) => {
-        const res = await fetch(
-          'https://nepalstock.com.np/api/nots/nepse-data/floorsheet?page=1&size=500&sort=contractId,desc',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: token,
-            },
-            body: JSON.stringify({ id: lastId }),
-          },
-        );
-
-        const text = await res.text();
-        try {
-          return JSON.parse(text);
-        } catch {
-          return { error: 'Not JSON', raw: text };
-        }
+    const res: any = await context.request.post(
+      'https://nepalstock.com.np/api/nots/nepse-data/floorsheet?page=1&size=500&sort=contractId,desc',
+      {
+        headers: {
+          AUthorization: authContext.token,
+        },
+        data: {
+          id: authContext.id,
+        },
       },
-      { token: context.token, lastId: context.id },
     );
+
+    const firstPageData = await res.json();
 
     return firstPageData;
   }
 
   private async fetchRemainingPages(
     page: Page,
-    context: NepseAuthContext,
+    authContext: NepseAuthContext,
     pageSize: number,
     totalPages: number,
     allTrades: any[],
     totalTrades: number,
+    context: BrowserContext,
     onProgress: (insertedCount: number) => void,
   ): Promise<void> {
-    let authToken = context.token;
-    let currentInitialId = context.id;
+    let authToken = authContext.token;
+    let currentInitialId = authContext.id;
 
     // First page is already fetched separately; start from page 2
     for (let pageNumber = 0; pageNumber < totalPages; pageNumber++) {
@@ -337,87 +328,41 @@ export class FloorsheetService {
             `Fetching page ${pageNumber + 1}, attempt ${attempt}/3, using initialId: ${currentInitialId}`,
           );
 
-          pageData = await page.evaluate(
-            async ({ token, pageSize: size, pageNumber, lastId }) => {
-              const res = await fetch(
-                `https://nepalstock.com.np/api/nots/nepse-data/floorsheet?page=${pageNumber}&size=${size}&sort=contractId,desc`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: token,
-                  },
-                  body: JSON.stringify({ id: lastId }),
-                },
-              );
-
-              const text = await res.text();
-              if (text.startsWith('<')) {
-                return { expired: true };
-              }
-
-              try {
-                const parsed = JSON.parse(text);
-                // Check if response has empty content array
-                if (
-                  parsed.floorsheets &&
-                  Array.isArray(parsed.floorsheets.content) &&
-                  parsed.floorsheets.content.length === 0
-                ) {
-                  return { empty: true, data: parsed };
-                }
-                return parsed;
-              } catch (parseError) {
-                return { error: 'Parse error', raw: text.substring(0, 200) };
-              }
-            },
+          const res = await context.request.post(
+            `https://nepalstock.com.np/api/nots/nepse-data/floorsheet?page=${pageNumber}&size=${pageSize}&sort=contractId,desc`,
             {
-              token: authToken,
-              pageSize,
-              pageNumber,
-              lastId: currentInitialId,
+              headers: {
+                Authorization: authToken,
+              },
+              data: {
+                id: currentInitialId,
+              },
             },
           );
 
-          if (pageData?.expired) {
-            console.log('Token expired, refreshing...');
-            const refreshResult =
-              await this.nepseAuthService.refreshCredentials(page);
-            authToken = refreshResult.token;
-            currentInitialId = refreshResult.id;
+          try {
+            pageData = await res.json();
+          } catch (error: any) {
+            if (
+              error instanceof SyntaxError &&
+              error.message.includes('Unexpected token')
+            ) {
+              console.log('Auth credentials expired. Refreshing... ');
 
-            console.log('Token refreshed successfully');
-            console.log('New authToken:', authToken?.substring(0, 20) + '...');
-            console.log('New initialId:', currentInitialId);
+              const newAuthContext =
+                await this.nepseAuthService.refreshCredentials(page);
 
-            // Wait a bit before retrying with new token
-            await page.waitForTimeout(1000);
-            continue; // Retry the request with new token
-          }
+              authToken = newAuthContext.token;
+              currentInitialId = newAuthContext.id;
 
-          if (pageData?.empty) {
-            console.warn(
-              `Page ${pageNumber + 1} returned empty array. Response:`,
-              JSON.stringify(pageData.data).substring(0, 200),
-            );
-            // Still mark as successful to avoid infinite retries
-            requestSuccessful = true;
+              continue;
+            }
+
+            console.log(error);
+
             break;
           }
 
-          if (pageData?.error) {
-            console.error(
-              `Error parsing response for page ${pageNumber + 1}:`,
-              pageData.error,
-              pageData.raw,
-            );
-            if (attempt < 3) {
-              await page.waitForTimeout(1000);
-              continue;
-            }
-          }
-
-          // Success - break out of retry loop
           requestSuccessful = true;
           break;
         } catch (error) {
