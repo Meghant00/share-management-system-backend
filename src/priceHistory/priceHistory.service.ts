@@ -378,8 +378,8 @@ export class PriceHistoryService {
     const formattedFromDate = formatDateInDDMMYYYY(fromDate);
     const formattedToDate = formatDateInDDMMYYYY(toDate);
 
-    let query = sql`SELECT ph.close_price AS closePrice, (EXTRACT(EPOCH FROM ph.business_date) * 1000) AS timestamp, 
-                    ph.business_date AS businessDate, ph.total_trade_quantity AS totalTradeQuantity, ph.total_trade_value AS totalTradeValue
+    let query = sql`SELECT ph.close_price AS "closePrice", (EXTRACT(EPOCH FROM ph.business_date) * 1000) AS timestamp, 
+                    ph.business_date AS "businessDate", ph.total_trade_quantity AS "totalTradeQuantity", ph.total_trade_value AS "totalTradeValue"
                     FROM price_history ph
                     WHERE ph.security_id = ${currentCompany.companyId}
                     AND ph.business_date BETWEEN ${formattedFromDate} AND ${formattedToDate}`;
@@ -413,8 +413,8 @@ export class PriceHistoryService {
                                     AND business_date BETWEEN ${formattedFromDate} AND ${formattedToDate}
                                   )
 	
-                                SELECT ph.close_price AS closePrice, (EXTRACT(EPOCH FROM ph.business_date) * 1000) AS timestamp, 
-                                ph.business_date AS businessDate, ph.total_trade_quantity AS totalTradeQuantity, ph.total_trade_value AS totalTradeValue
+                                SELECT ph.close_price AS "closePrice", (EXTRACT(EPOCH FROM ph.business_date) * 1000) AS timestamp, 
+                                ph.business_date AS "businessDate", ph.total_trade_quantity AS "totalTradeQuantity", ph.total_trade_value AS "totalTradeValue"
                                 FROM price_history ph
                                 JOIN RankedDates r
                                   ON ph.business_date = r.business_date
