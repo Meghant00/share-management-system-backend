@@ -14,4 +14,9 @@ export class CompanyController {
   async getAllCompanies() {
     return this.companyService.getAllCompanies();
   }
+
+  @Get('/active')
+  async getActiveCompanies() {
+    return this.companyService.getActiveCompanies();
+  }
 }
