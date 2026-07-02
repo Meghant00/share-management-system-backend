@@ -1,12 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { chromium, Page } from 'playwright';
+import { BrowserContext, chromium, Page } from 'playwright';
 import * as schema from '../database/schema/broker';
 import { eq } from 'drizzle-orm';
 import {
   NepseAuthContext,
   NepseAuthService,
 } from 'src/nepseAuth/nepseAuth.service';
+import { PlayWrightService } from 'src/playWright/playWright.service';
 
 export interface BrokerResult {
   totalBrokers: number;
@@ -28,23 +29,12 @@ export class BrokerService {
   constructor(
     @Inject('DB') private db: NodePgDatabase<typeof schema>,
     private readonly nepseAuthService: NepseAuthService,
+    private readonly playWrightService: PlayWrightService,
   ) {}
 
   async fetchAndSaveBrokers(): Promise<BrokerResult> {
-    const browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage',
-        '--no-sandbox',
-      ],
-    });
-    const context = await browser.newContext({
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      viewport: { width: 1920, height: 1080 },
-    });
-    const page = await context.newPage();
+    const { browser, context, page } =
+      await this.playWrightService.initializeBrowserContext();
 
     console.log('Fetching brokers...');
 
@@ -53,7 +43,7 @@ export class BrokerService {
 
       console.log('Authenticated');
 
-      const brokersData = await this.fetchBrokers(page, authContext);
+      const brokersData = await this.fetchBrokers(context, authContext);
 
       const brokers = brokersData.content;
 
@@ -69,31 +59,20 @@ export class BrokerService {
   }
 
   private async fetchBrokers(
-    page: Page,
-    context: NepseAuthContext,
+    context: BrowserContext,
+    authContext: NepseAuthContext,
   ): Promise<any> {
-    const brokersData: any = await page.evaluate(
-      async ({ token }) => {
-        const res = await fetch(
-          'https://nepalstock.com.np/api/nots/member?&size=500',
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: token,
-            },
-          },
-        );
-
-        const text = await res.text();
-        try {
-          return JSON.parse(text);
-        } catch {
-          return { error: 'Not JSON', raw: text };
-        }
+    const brokersDataRes = await context.request.get(
+      `https://nepalstock.com.np/api/nots/member?&size=500`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authContext.token,
+        },
       },
-      { token: context.token },
     );
+
+    const brokersData = await brokersDataRes.json();
 
     return brokersData;
   }
