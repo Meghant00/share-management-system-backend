@@ -293,7 +293,7 @@ export class PriceHistoryService {
           securityId: company.securityId,
           openPrice: company.openPrice,
           highPrice: company.highPrice,
-          closePrice: company.closePrice,
+          closePrice: company.closePrice ?? company.lastUpdatedPrice,
           averageTradePrice: company.averageTradedPrice,
           fiftyTwoWeekHigh: company.fiftyTwoWeekHigh,
           fiftyTwoWeekLow: company.fiftyTwoWeekLow,
@@ -382,7 +382,8 @@ export class PriceHistoryService {
                     ph.business_date AS "businessDate", ph.total_trade_quantity AS "totalTradeQuantity", ph.total_trade_value AS "totalTradeValue"
                     FROM price_history ph
                     WHERE ph.security_id = ${currentCompany.companyId}
-                    AND ph.business_date BETWEEN ${formattedFromDate} AND ${formattedToDate}`;
+                    AND ph.business_date BETWEEN ${formattedFromDate} AND ${formattedToDate}
+                    ORDER BY ph.business_date`;
 
     const result = await this.db.execute(query);
 
