@@ -51,8 +51,6 @@ export const getFromDateAndToDateFromPriceHistoryPeriod = (
 
       let firstDayOfWeek = toDate.getDate() - currentDay;
 
-      const lastDayOfWeek = toDate.getDate() + (6 - currentDay);
-
       if (firstDayOfWeek < 1) {
         const lastDayOfPreviousMonth = new Date(
           toDate.getFullYear(),
@@ -67,12 +65,17 @@ export const getFromDateAndToDateFromPriceHistoryPeriod = (
         );
       } else {
         fromDate = new Date(
-          `${toDate.getFullYear()}-${currentMonth >= 10 ? '' : 0}${currentMonth}-${firstDayOfWeek}`,
+          `${toDate.getFullYear()}-${currentMonth >= 10 ? '' : 0}${currentMonth}-${firstDayOfWeek >= 10 ? '' : 0}${firstDayOfWeek}`,
         );
       }
 
+      toDate.setDate(toDate.getDate() + (6 - currentDay));
+
+      const lastDayOfWeekMonth = toDate.getMonth() + 1;
+      const lastDayOfWeek = toDate.getDate();
+
       toDate = new Date(
-        `${toDate.getFullYear()}-${currentMonth >= 10 ? '' : 0}${currentMonth}-${lastDayOfWeek}`,
+        `${toDate.getFullYear()}-${lastDayOfWeekMonth >= 10 ? '' : 0}${lastDayOfWeekMonth}-${lastDayOfWeek >= 10 ? '' : 0}${lastDayOfWeek}`,
       );
 
       break;
