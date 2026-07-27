@@ -29,4 +29,11 @@ export class ReportController {
       toDate,
     );
   }
+
+  @Get('/company/:symbol')
+  public async getCompanyReport(@Param() param) {
+    const { symbol } = param;
+
+    return this.reportService.getCompanyReport(symbol);
+  }
 }

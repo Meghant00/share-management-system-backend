@@ -7,7 +7,8 @@ import {
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { db } from 'src/database/database';
 import * as schema from '../database/schema/floorsheet';
-import { sql } from 'drizzle-orm';
+import * as companySchema from '../database/schema/company';
+import { eq, sql } from 'drizzle-orm';
 
 export interface HoldingResult {
   total: number;
@@ -25,7 +26,10 @@ interface HolderResult {
 
 @Injectable()
 export class ReportService {
-  constructor(@Inject('DB') private db: NodePgDatabase<typeof schema>) {}
+  constructor(
+    @Inject('DB') private db: NodePgDatabase<typeof schema>,
+    @Inject('DB') private companyDb: NodePgDatabase<typeof companySchema>,
+  ) {}
 
   public async getTotalHoldingsOfBrokerByCompany(
     stockSymbol: string,
@@ -131,5 +135,32 @@ export class ReportService {
     );
 
     return { total: total || 0, holders: parsedHolders };
+  }
+
+  public async getCompanyReport(symbol: string) {
+    if (!symbol) {
+      return {
+        error: true,
+        message: 'Company is required.',
+      };
+    }
+
+    const result = await this.companyDb
+      .select({
+        companyName: companySchema.company.companyName,
+        symbol: companySchema.company.symbol,
+        securityName: companySchema.company.securityName,
+      })
+      .from(companySchema.company)
+      .where(
+        eq(sql`upper(${companySchema.company.symbol})`, symbol.toUpperCase()),
+      );
+
+    const company = result[0];
+
+    return {
+      success: true,
+      company,
+    };
   }
 }
