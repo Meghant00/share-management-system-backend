@@ -1,7 +1,6 @@
 import {
   Inject,
   Injectable,
-  InternalServerErrorException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -63,7 +62,7 @@ export class ReportService {
                       ORDER BY 
                           total_quantity DESC;`;
 
-    const result = await db.execute(query);
+    const result = await this.db.execute(query);
 
     const total = result.rowCount;
 
@@ -145,18 +144,16 @@ export class ReportService {
       };
     }
 
-    const result = await this.companyDb
-      .select({
-        companyName: companySchema.company.companyName,
-        symbol: companySchema.company.symbol,
-        securityName: companySchema.company.securityName,
-      })
-      .from(companySchema.company)
-      .where(
-        eq(sql`upper(${companySchema.company.symbol})`, symbol.toUpperCase()),
-      );
+    const companyReportQuery = sql`SELECT c.company_name AS "companyName", c.symbol, ph.close_price, ph.business_date FROM price_history ph
+                                  INNER JOIN company c
+                                  ON c."companyId" = ph.security_id
+                                  WHERE UPPER(c.symbol) = UPPER(${symbol})
+                                  ORDER BY ph.business_date DESC
+                                  LIMIT 1;`;
 
-    const company = result[0];
+    const result = await db.execute(companyReportQuery);
+
+    const company = result.rows[0];
 
     return {
       success: true,
