@@ -144,16 +144,44 @@ export class ReportService {
       };
     }
 
-    const companyReportQuery = sql`SELECT c.company_name AS "companyName", c.symbol, ph.close_price, ph.business_date FROM price_history ph
-                                  INNER JOIN company c
-                                  ON c."companyId" = ph.security_id
-                                  WHERE UPPER(c.symbol) = UPPER(${symbol})
-                                  ORDER BY ph.business_date DESC
-                                  LIMIT 1;`;
+    const companyReportQuery = sql`WITH ranked_prices AS (
+                                  SELECT security_id, total_trades, average_trade_price, total_trade_value, total_trade_quantity, close_price, business_date,
+                                    ROW_NUMBER() OVER (
+                                      PARTITION BY security_id 
+                                            ORDER BY business_date DESC
+                                        ) as row_num
+                                    FROM price_history ph
+                                    INNER JOIN company c ON c."companyId" = ph.security_id
+                                    WHERE c.symbol = ${symbol}
+                                  )
+
+                                SELECT 
+                                    c.company_name, c.symbol, c."companyId", 
+                                    SUM(total_trades) AS total_trades, 
+                                    AVG(average_trade_price) AS average_trade_price, 
+                                    SUM(total_trade_value) AS total_trade_value, 
+                                    SUM(total_trade_quantity) AS total_trade_quantity,
+                                    MAX(CASE WHEN row_num = 1 THEN close_price END) AS last_close_price,
+                                    MAX(CASE WHEN row_num = 1 THEN business_date END) AS business_date
+                                FROM ranked_prices rc
+                                INNER JOIN company c
+                                ON c."companyId" = rc.security_id
+                                GROUP BY c."companyId", c.company_name, c.symbol, rc.security_id;`;
 
     const result = await db.execute(companyReportQuery);
 
-    const company = result.rows[0];
+    const data = result.rows[0];
+
+    const company = {
+      companyName: data.company_name,
+      totalTrades: data.total_trades,
+      averageTradePrice: data.average_trade_price,
+      totalTradeValue: data.total_trade_value,
+      totalTradeQuantity: data.total_trade_quantity,
+      companyId: data.companyId,
+      businessDate: data.businessDate,
+      symbol: data.symbol,
+    };
 
     return {
       success: true,
