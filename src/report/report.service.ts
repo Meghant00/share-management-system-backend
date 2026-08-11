@@ -145,28 +145,30 @@ export class ReportService {
     }
 
     const companyReportQuery = sql`WITH ranked_prices AS (
-                                  SELECT security_id, total_trades, average_trade_price, total_trade_value, total_trade_quantity, close_price, business_date,
-                                    ROW_NUMBER() OVER (
+                                    SELECT security_id, total_trades, average_trade_price, total_trade_value, total_trade_quantity, close_price, business_date,
+                                      ROW_NUMBER() OVER (
                                       PARTITION BY security_id 
-                                            ORDER BY business_date DESC
-                                        ) as row_num
+                                      ORDER BY business_date DESC
+                                      ) as row_num
                                     FROM price_history ph
                                     INNER JOIN company c ON c."companyId" = ph.security_id
                                     WHERE c.symbol = ${symbol}
-                                  )
+                                    )
 
-                                SELECT 
-                                    c.company_name, c.symbol, c."companyId", 
-                                    SUM(total_trades) AS total_trades, 
-                                    AVG(average_trade_price) AS average_trade_price, 
-                                    SUM(total_trade_value) AS total_trade_value, 
-                                    SUM(total_trade_quantity) AS total_trade_quantity,
-                                    MAX(CASE WHEN row_num = 1 THEN close_price END) AS last_close_price,
-                                    MAX(CASE WHEN row_num = 1 THEN business_date END) AS business_date
-                                FROM ranked_prices rc
-                                INNER JOIN company c
-                                ON c."companyId" = rc.security_id
-                                GROUP BY c."companyId", c.company_name, c.symbol, rc.security_id;`;
+                                    SELECT 
+                                      c.company_name, c.symbol, c."companyId", 
+                                      SUM(total_trades) AS total_trades, 
+                                      AVG(average_trade_price) AS average_trade_price, 
+                                      SUM(total_trade_value) AS total_trade_value, 
+                                      SUM(total_trade_quantity) AS total_trade_quantity,
+                                      MAX(CASE WHEN row_num = 1 THEN close_price END) AS last_close_price,
+                                      (MAX(CASE WHEN row_num = 1 THEN close_price END) - MAX(CASE WHEN row_num = 2 THEN close_price END)) AS price_difference,
+                                      (((MAX(CASE WHEN row_num = 1 THEN close_price END) - MAX(CASE WHEN row_num = 2 THEN close_price END)) / MAX(CASE WHEN row_num = 2 THEN close_price END)) * 100) AS last_price_change_percentage,
+                                      MAX(CASE WHEN row_num = 1 THEN business_date END) AS business_date
+                                    FROM ranked_prices rc
+                                    INNER JOIN company c
+                                    ON c."companyId" = rc.security_id
+                                    GROUP BY c."companyId", c.company_name, c.symbol, rc.security_id;`;
 
     const result = await db.execute(companyReportQuery);
 
@@ -180,6 +182,9 @@ export class ReportService {
       totalTradeQuantity: data.total_trade_quantity,
       companyId: data.companyId,
       businessDate: data.businessDate,
+      lastClosingPrice: data.last_close_price,
+      priceChange: data.price_difference,
+      priceChangePercent: data.last_price_change_percentage,
       symbol: data.symbol,
     };
 
