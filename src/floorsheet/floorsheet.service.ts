@@ -19,6 +19,7 @@ import { CompanyService } from 'src/company/company.service';
 import { BrokerService } from 'src/broker/broker.service';
 import { TodaysPriceService } from 'src/todaysPrice/todaysPrice.service';
 import { PlayWrightService } from 'src/playWright/playWright.service';
+import { PriceHistoryService } from 'src/priceHistory/priceHistory.service';
 
 export interface FloorsheetAuthContext {
   authToken: string;
@@ -83,6 +84,7 @@ export class FloorsheetService {
     private readonly brokerService: BrokerService,
     private readonly todaysPriceService: TodaysPriceService,
     private readonly playWrightService: PlayWrightService,
+    private readonly priceHistoryService: PriceHistoryService,
   ) {
     this.keys = [
       'sn',
@@ -193,7 +195,17 @@ export class FloorsheetService {
 
       this.isProcessing = false;
 
-      await this.todaysPriceService.fetchAndSaveTodaysPrice();
+      if (firstPageData) {
+        const firstData = firstPageData.floorsheets.content[0];
+
+        if (firstData) {
+          const fromDate = firstData.businessDate;
+
+          await this.priceHistoryService.fetchAndSavePriceHistoryByFromDateAndToDate(
+            { fromDate: fromDate },
+          );
+        }
+      }
 
       return { totalTrades: allTrades.length };
     } catch (error) {
