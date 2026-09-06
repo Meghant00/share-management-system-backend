@@ -141,6 +141,13 @@ export class CompanyService {
           .values(company)
           .onConflictDoNothing();
         insertedCompanies++;
+      } else {
+        const currentCompany = doesCompanyExists[0];
+
+        await this.db
+          .update(schema.company)
+          .set(company)
+          .where(eq(schema.company.companyId, Number(currentCompany.code)));
       }
     }
 
