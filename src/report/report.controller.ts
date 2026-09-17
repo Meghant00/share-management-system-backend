@@ -5,12 +5,12 @@ import { ReportService } from './report.service';
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
-  @Get('/get-broker-holdings/:company')
-  public getTotalHoldingsOfBrokerByCompany(@Param() param, @Query() query) {
+  @Get('/get-broker-buyings/:company')
+  public getTotalBuyingsOfBrokerByCompany(@Param() param, @Query() query) {
     const { company } = param;
     const { fromDate, toDate } = query;
 
-    return this.reportService.getTotalHoldingsOfBrokerByCompany(
+    return this.reportService.getTotalBuyingsOfBrokerByCompany(
       company,
       fromDate,
       toDate,

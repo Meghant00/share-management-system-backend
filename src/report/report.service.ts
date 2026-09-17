@@ -11,7 +11,7 @@ import { eq, sql } from 'drizzle-orm';
 
 export interface HoldingResult {
   total: number;
-  holders: HolderResult[];
+  traders: HolderResult[];
 }
 
 interface HolderResult {
@@ -30,7 +30,7 @@ export class ReportService {
     @Inject('DB') private companyDb: NodePgDatabase<typeof companySchema>,
   ) {}
 
-  public async getTotalHoldingsOfBrokerByCompany(
+  public async getTotalBuyingsOfBrokerByCompany(
     stockSymbol: string,
     fromDate?: string,
     toDate?: string,
@@ -68,7 +68,7 @@ export class ReportService {
 
     const data = result.rows;
 
-    const parsedHolders: HolderResult[] = data.map(
+    const parsedBuyers: HolderResult[] = data.map(
       (holder: any, index: number) => {
         return {
           buyer: holder.buyer,
@@ -80,7 +80,7 @@ export class ReportService {
       },
     );
 
-    return { total: total || 0, holders: parsedHolders };
+    return { total: total || 0, traders: parsedBuyers };
   }
 
   public async getTotalSellingOfBrokerByCompany(
@@ -133,7 +133,7 @@ export class ReportService {
       },
     );
 
-    return { total: total || 0, holders: parsedHolders };
+    return { total: total || 0, traders: parsedHolders };
   }
 
   public async getCompanyReport(symbol: string) {
