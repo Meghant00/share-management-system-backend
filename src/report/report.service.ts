@@ -136,6 +136,82 @@ export class ReportService {
     return { total: total || 0, traders: parsedHolders };
   }
 
+  public async getTotalHoldingsOfBroker(
+    stockSymbol: string,
+    fromDate?: string,
+    toDate?: string,
+  ) {
+    const fromDateTimestamp = new Date(fromDate || 0).getTime();
+    const toDateTimeStamp = toDate ? new Date(toDate).getTime() : Date.now();
+
+    if (toDateTimeStamp < fromDateTimestamp) {
+      console.log('From should be less than to date.');
+      throw new UnprocessableEntityException(
+        'From should be less than to date.',
+      );
+    }
+
+    const query = sql`WITH selling_report AS  
+                      (SELECT 
+                      f.seller_member_id AS seller,
+                      ROUND(SUM(f.contract_quantity), 4) AS total_quantity,
+                      ROUND(AVG(f.contract_rate), 4) AS average_rate,
+                      ROUND(AVG(f.contract_amount), 4) AS average_amount
+                      FROM floorsheet f
+                      INNER JOIN company c
+                      ON f.stock_symbol = c.symbol
+                      WHERE 
+                      f.stock_symbol = UPPER(${stockSymbol})
+                      AND f.business_date >= TO_TIMESTAMP(${fromDateTimestamp} / 1000.00)::date AND f.business_date < TO_TIMESTAMP(${toDateTimeStamp} / 1000.00)::date
+                      GROUP BY 
+                      f.seller_member_id, 
+                      f.stock_symbol
+                      ORDER BY 
+                      total_quantity DESC),
+
+                      buying_report AS  
+                      (SELECT 
+                      f.buyer_member_id AS buyer,
+                      ROUND(SUM(f.contract_quantity), 4) AS total_quantity,
+                      ROUND(AVG(f.contract_rate), 4) AS average_rate,
+                      ROUND(AVG(f.contract_amount), 4) AS average_amount
+                      FROM floorsheet f
+                      INNER JOIN company c
+                      ON f.stock_symbol = c.symbol
+                      WHERE 
+                      f.stock_symbol = UPPER(${stockSymbol})
+                      AND f.business_date >= TO_TIMESTAMP(${fromDateTimestamp} / 1000.00)::date AND f.business_date < TO_TIMESTAMP(${toDateTimeStamp} / 1000.00)::date
+                      GROUP BY 
+                      f.buyer_member_id, 
+                      f.stock_symbol
+                      ORDER BY 
+                      total_quantity DESC)
+                      
+                      SELECT seller, GREATEST(0, (br.total_quantity - sr.total_quantity)) as total_quantity, br.average_amount, br.average_rate from selling_report sr
+                      INNER JOIN buying_report br
+                      ON sr.seller = br.buyer;`;
+
+    const result = await db.execute(query);
+
+    const total = result.rowCount;
+
+    const data = result.rows;
+
+    const parsedHolders: HolderResult[] = data.map(
+      (holder: any, index: number) => {
+        return {
+          seller: holder.seller,
+          totalQuantity: Number(holder.total_quantity),
+          averageRate: Number(holder.average_rate),
+          averageAmount: Number(holder.average_amount),
+          sn: index + 1,
+        };
+      },
+    );
+
+    return { total: total || 0, traders: parsedHolders };
+  }
+
   public async getCompanyReport(symbol: string) {
     if (!symbol) {
       return {
@@ -192,47 +268,5 @@ export class ReportService {
       success: true,
       company,
     };
-  }
-
-  public async getTotalHoldingsOfBroker() {
-    const query = sql`WITH selling_report AS  
-                      (SELECT 
-                      f.seller_member_id AS seller,
-                      ROUND(SUM(f.contract_quantity), 4) AS total_quantity,
-                      ROUND(AVG(f.contract_rate), 4) AS average_rate,
-                      ROUND(AVG(f.contract_amount), 4) AS average_amount
-                      FROM floorsheet f
-                      INNER JOIN company c
-                      ON f.stock_symbol = c.symbol
-                      WHERE 
-                      f.stock_symbol = UPPER('ADBL')
-                      AND f.business_date >= TO_TIMESTAMP(0)::date AND f.business_date < TO_TIMESTAMP(1789730482267 / 1000.00)::date
-                      GROUP BY 
-                      f.seller_member_id, 
-                      f.stock_symbol
-                      ORDER BY 
-                      total_quantity DESC),
-
-                      buying_report AS  
-                      (SELECT 
-                      f.buyer_member_id AS buyer,
-                      ROUND(SUM(f.contract_quantity), 4) AS total_quantity,
-                      ROUND(AVG(f.contract_rate), 4) AS average_rate,
-                      ROUND(AVG(f.contract_amount), 4) AS average_amount
-                      FROM floorsheet f
-                      INNER JOIN company c
-                      ON f.stock_symbol = c.symbol
-                      WHERE 
-                      f.stock_symbol = UPPER('ADBL')
-                      AND f.business_date >= TO_TIMESTAMP(0)::date AND f.business_date < TO_TIMESTAMP(1789730482267 / 1000.00)::date
-                      GROUP BY 
-                      f.buyer_member_id, 
-                      f.stock_symbol
-                      ORDER BY 
-                      total_quantity DESC)
-                      
-                      SELECT seller, (br.total_quantity - sr.total_quantity) as total_quantity, br.average_amount, br.average_rate from selling_report sr
-                      INNER JOIN buying_report br
-                      ON sr.seller = br.buyer;`;
   }
 }

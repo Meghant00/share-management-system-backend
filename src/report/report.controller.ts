@@ -1,11 +1,11 @@
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
-import { ReportService } from './report.service';
+import { HoldingResult, ReportService } from './report.service';
 
 @Controller('report')
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
-  @Get('/get-broker-buyings/:company')
+  @Get('/get-broker-buying/:company')
   public getTotalBuyingsOfBrokerByCompany(@Param() param, @Query() query) {
     const { company } = param;
     const { fromDate, toDate } = query;
@@ -24,6 +24,22 @@ export class ReportController {
     const { fromDate, toDate } = query;
 
     return this.reportService.getTotalSellingOfBrokerByCompany(
+      company,
+      fromDate,
+      toDate,
+    );
+  }
+
+  @Get('/get-broker-holding/:company')
+  public getTotalHoldingOfBrokerByCompany(
+    @Param() param,
+    @Query() query,
+  ): Promise<HoldingResult> {
+    const { company } = param;
+
+    const { fromDate, toDate } = query;
+
+    return this.reportService.getTotalHoldingsOfBroker(
       company,
       fromDate,
       toDate,
