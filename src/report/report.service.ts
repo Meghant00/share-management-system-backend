@@ -189,7 +189,8 @@ export class ReportService {
                       
                       SELECT seller, GREATEST(0, (br.total_quantity - sr.total_quantity)) as total_quantity, br.average_amount, br.average_rate from selling_report sr
                       INNER JOIN buying_report br
-                      ON sr.seller = br.buyer;`;
+                      ON sr.seller = br.buyer
+                      ORDER BY total_quantity DESC;`;
 
     const result = await db.execute(query);
 
